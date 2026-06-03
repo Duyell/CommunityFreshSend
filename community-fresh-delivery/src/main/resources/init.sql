@@ -298,8 +298,7 @@ CREATE TABLE `review` (
     `order_id`    BIGINT        NOT NULL                COMMENT '订单ID',
     `user_id`     BIGINT        NOT NULL                COMMENT '评价用户ID',
     `product_id`  BIGINT        NOT NULL                COMMENT '被评价商品ID',
-    `freshness`   TINYINT       NOT NULL                COMMENT '新鲜度评分（1-5星）',
-    `match_score` TINYINT       NOT NULL                COMMENT '描述相符评分（1-5星）',
+    `score`       TINYINT       NOT NULL                COMMENT '评分（1-5星）',
     `content`     VARCHAR(500)  DEFAULT ''              COMMENT '文字评价',
     `images`      VARCHAR(1024) DEFAULT ''              COMMENT '评价图片 OSS Key 列表（JSON 数组）',
     `create_time` DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '评价时间',
@@ -401,13 +400,12 @@ CREATE TABLE `operation_log` (
 -- 初始数据
 -- ============================================
 
--- 测试用户（密码明文均为 "123456"，hash 由 BCryptPasswordEncoder 生成后手动填入）
--- 当前为占位 hash，部署时替换为真实 BCrypt 密文
+-- 测试用户（密码明文均为 "123456"，hash 由 BcryptPasswordGeneratorTest 生成）
 INSERT INTO `user` (`id`, `phone`, `password`, `nickname`) VALUES
-(1, '13800000001', '$2a$10$PLACEHOLDER_HASH_REPLACE_AFTER_FIRST_RUN', '测试居民'),
-(2, '13800000002', '$2a$10$PLACEHOLDER_HASH_REPLACE_AFTER_FIRST_RUN', '测试配送员'),
-(3, '13800000003', '$2a$10$PLACEHOLDER_HASH_REPLACE_AFTER_FIRST_RUN', '测试商家'),
-(4, '13800000004', '$2a$10$PLACEHOLDER_HASH_REPLACE_AFTER_FIRST_RUN', '测试管理员');
+(1, '13800000001', '$2a$10$kq4ydwt54PVMpyJrO3FFUOjo/JfjfB/n7l3G5U4SVWCy90axuxUqu', '测试居民'),
+(2, '13800000002', '$2a$10$rxu4hb2pyDmmytS09jxvnuKyFdxhefz38y3vuJEB7QC0iyTLBgSBe', '测试配送员'),
+(3, '13800000003', '$2a$10$sjUjCUC5rgy.ealYe6B39etx6sfCotYYn8JOJSL3Nt8.7IF8R7TVW', '测试商家'),
+(4, '13800000004', '$2a$10$kEFPoal471.V4dNQtGGkG.oYMfHoX8GA/Qst4fMihUF31m0NXbMyq', '测试管理员');
 
 -- 用户角色
 INSERT INTO `user_role` (`user_id`, `role`) VALUES

@@ -1,7 +1,7 @@
 package com.duyell.communityfreshdelivery.common.security;
 
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -31,12 +31,14 @@ public class UserDetailsImpl implements UserDetails {
 
     /** 用户 ID */
     @Getter
-    private final Long userId;
+    private final long userId;
 
-    /** 加密后的密码（BCrypt），由 DaoAuthenticationProvider 自动比对 */
+    /** 加密后的密码（BCrypt）。JWT 认证时为 null（token 已验证，无需密码） */
     private final String password;
 
     /** 角色列表（如 {@code ROLE_USER, ROLE_DELIVERY}） */
+    @Getter
+    @NonNull
     private final List<String> roles;
 
     /**

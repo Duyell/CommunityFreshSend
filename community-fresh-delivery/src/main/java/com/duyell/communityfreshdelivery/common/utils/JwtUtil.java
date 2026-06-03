@@ -94,6 +94,23 @@ public class JwtUtil {
     }
 
     /**
+     * 从 token 中提取角色列表.
+     *
+     * @param token JWT 字符串，调用方需确保已通过 {@link #isTokenValid} 校验
+     * @return 角色列表（如 {@code ["ROLE_USER", "ROLE_DELIVERY"]}），claim 不存在时返回空列表
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> getRolesFromToken(String token) {
+        Object rolesObj = parseClaims(token).get("roles");
+        if (rolesObj instanceof List<?> list) {
+            return list.stream()
+                    .map(Object::toString)
+                    .toList();
+        }
+        return List.of();
+    }
+
+    /**
      * 校验 token 是否合法且在有效期内.
      *
      * @param token JWT 字符串

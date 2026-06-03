@@ -6,7 +6,7 @@
 
 - 项目名称：社区生鲜配送系统
 - 项目路径：`community-fresh-delivery`
-- 技术栈：SpringBoot 4.0.6 + MyBatis-Plus 3.5.9 + MySQL 8.0 + Redis + RabbitMQ 4.3
+- 技术栈：SpringBoot 3.4.7 + MyBatis-Plus 3.5.9 + MySQL 8.0 + Redis + RabbitMQ 4.3
 - Java 21 + Maven 3.9
 - 远程仓库：已绑定
 
@@ -32,10 +32,20 @@
 | | JWT 工具类 JwtUtil | 构造注入，jjwt 0.12.6 |
 | | UserDetailsImpl | userId + password + roles → GrantedAuthority |
 | | UserDetailsServiceImpl | 注入 Mapper，真实查库 |
-| | `init.sql` 完整建表脚本 | 18 张业务表 + 初始数据（用户/角色/配置）+ 索引 |
+| | `init.sql` 完整建表脚本 | 19 张业务表 + 初始数据（用户/角色/配置）+ 索引 |
 | | Entity（User / UserRole） + Mapper | MyBatis-Plus 映射，逻辑删除 |
 | | 订单编号规范 | 14 位时间戳 + 8 位随机码 |
 | | `project-structure.md` 项目结构文档 | 逐文件功能说明 + 目录树 |
+| 2026-06-03 | `init.sql` 数据库优化 | review 表合并评分字段（freshness+match_score → score） |
+| | BcryptPasswordGeneratorTest | 生成 "123456" 的 BCrypt 真实 hash，替换 init.sql 占位符 |
+| | `init.sql` 本地执行 | 19 张表全部创建成功，测试数据写入无误 |
+| | `function.md` 配送员模块完善 | 补全申请流程 + 模式切换 + 权限边界，与团长对称 |
+| | 数据库设计回顾 | 确认 payment.idx_order_id / sys_config 设计合理性 |
+| | JWT 认证过滤器 + SecurityConfig | JwtAuthenticationFilter + SecurityConfig（无状态 + 路由权限 + 401/403 JSON） |
+| | 登录 & 注册接口全链路 | POST /api/auth/login + /register，AuthenticationManager + BCrypt + JWT |
+| | Spring Boot 降级 4.0.6→3.4.7 | mybatis-plus-spring-boot3-starter 不兼容 Boot 4，降级后删手动装配 |
+| | 端到端测试 | curl 测试全部通过（注册/重复注册/正确密码/错误密码/参数校验） |
+| | 包整理 | vo 包合并到 dto，减少过度拆分 |
 
 ---
 
@@ -50,24 +60,33 @@
 - [x] 全局代码注释规范 — 所有类补充完整 JavaDoc（功能说明 + 使用示例 + 扩展指南）
 - [x] **2.1** JWT 工具类 — JwtUtil（构造注入，jjwt 0.12.6，密钥/过期时间从 yml 读取）
 
-## 第二步 Spring Security + JWT 认证（进行中）
+## 第二步 Spring Security + JWT 认证（已完成 ✅）
 
 - [x] **2.1** JWT 工具类 `common/utils/JwtUtil.java`
 - [x] **2.2** 创建 `common/security` 包
-- [x] **2.3** UserDetails 实现类 `UserDetailsImpl.java` — userId + roles → GrantedAuthority
-- [x] **2.4** UserDetailsService `UserDetailsServiceImpl.java` — 真实 Mapper 查询
-- [x] `init.sql` 完整建表 — 18 张业务表 + 索引 + 初始数据
+- [x] **2.3** UserDetails 实现类 `UserDetailsImpl.java`
+- [x] **2.4** UserDetailsService `UserDetailsServiceImpl.java`
+- [x] `init.sql` 完整建表 — 19 张业务表 + 索引 + 初始数据
 - [x] Entity + Mapper（User / UserRole）
-- [x] `project-structure.md` 项目结构文档
-- [ ] **2.5** JWT 认证过滤器 `JwtAuthenticationFilter.java`
-- [ ] **2.6** SecurityConfig 安全配置
-- [ ] **2.7** AuthController 登录接口
-- [ ] **2.8** AuthController 注册接口
+- [x] 数据库本地初始化 → 19 张表全部建好
+- [x] **2.5** JWT 认证过滤器 `JwtAuthenticationFilter.java`
+- [x] **2.6** SecurityConfig 安全配置
+- [x] **2.7** AuthController 登录接口
+- [x] **2.8** AuthController 注册接口
+- [x] 端到端测试 → 注册/登录/校验全部通过
+- [x] Spring Boot 版本稳定 → 降级 3.4.7，去除手动装配补丁
+
+---
+
+## 第三步 商品模块（待开始）
+
+- [ ] **3.1** 分类接口 — 分类树查询
+- [ ] **3.2** 商品 CRUD — 商家端商品管理
+- [ ] **3.3** 商品列表 — 用户端分类浏览 + 搜索
 
 ---
 
 ## 下次待做
 
-- [ ] 2.5 JWT 认证过滤器
-- [ ] 随后依次推进 2.6 ~ 2.8
+- [ ] 3.1 商品分类接口
 

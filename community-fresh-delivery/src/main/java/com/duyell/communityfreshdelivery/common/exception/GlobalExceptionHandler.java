@@ -2,6 +2,7 @@ package com.duyell.communityfreshdelivery.common.exception;
 
 import com.duyell.communityfreshdelivery.common.result.Result;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -51,6 +52,16 @@ public class GlobalExceptionHandler {
                 .orElse("参数校验失败");
         log.warn("参数校验异常: {}", msg);
         return Result.fail(400, msg);
+    }
+
+    /**
+     * 登录认证失败 — 手机号或密码错误.
+     * <p>由 {@code AuthenticationManager.authenticate()} 抛出，message 不暴露具体是"用户不存在"还是"密码错误".</p>
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public Result<?> handleAuthenticationException(AuthenticationException e) {
+        log.warn("登录认证失败: {}", e.getMessage());
+        return Result.fail(401, "手机号或密码错误");
     }
 
     /**

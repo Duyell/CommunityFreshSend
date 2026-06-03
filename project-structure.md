@@ -2,7 +2,7 @@
 # 项目结构文档
 
 > 社区生鲜配送系统 — 完整项目文件索引与功能说明  
-> 更新日期：2026-06-01
+> 更新日期：2026-06-03
 
 ---
 
@@ -20,26 +20,27 @@
 ## 根目录文件
 
 ### `pom.xml`
-Maven 项目描述文件。定义坐标 `com.duyell:community-fresh-delivery:0.0.1-SNAPSHOT`，继承 `spring-boot-starter-parent:4.0.6`（Java 21）。
+Maven 项目描述文件。定义坐标 `com.duyell:community-fresh-delivery:0.0.1-SNAPSHOT`，继承 `spring-boot-starter-parent:3.4.7`（Java 21）。
+
+**Why Boot 3.4.7：** `mybatis-plus-spring-boot3-starter:3.5.9` 仅兼容 Spring Boot 3.x，Boot 4.x 下 SqlSessionFactory 自动装配失效。生态成熟后升级。
 
 **依赖清单：**
-| 依赖 | 版本 | 用途 |
-|------|------|------|
-| `spring-boot-starter-webmvc` | 4.0.6 | REST 接口 + 内嵌 Tomcat |
-| `spring-boot-starter-security` | 4.0.6 | 认证鉴权框架 |
-| `spring-boot-starter-data-redis` | 4.0.6 | Redis 缓存 / 分布式锁 |
-| `spring-boot-starter-amqp` | 4.0.6 | RabbitMQ 消息队列 |
-| `spring-boot-starter-validation` | 4.0.6 | Bean Validation 参数校验 |
-| `mybatis-plus-spring-boot3-starter` | 3.5.9 | ORM 框架（含自动填充 / 逻辑删除） |
-| `mybatis-plus-jsqlparser` | 3.5.9 | 分页 SQL 解析（3.5.9 起独立模块） |
-| `mysql-connector-j` | runtime | MySQL 驱动 |
-| `knife4j-openapi3-jakarta-spring-boot-starter` | 4.5.0 | Swagger 接口文档 UI |
-| `jjwt-api / jjwt-impl / jjwt-jackson` | 0.12.6 | JWT 令牌签发 / 解析 |
-| `aliyun-sdk-oss` | 3.18.1 | 阿里云 OSS 文件上传 |
-| `hutool-all` | 5.8.30 | 通用工具库 |
-| `lombok` | optional | 简化 getter/setter/构造器 |
-
-> 仅列生产依赖，test 依赖（含 `-test` 后缀的 starter）略。
+| 依赖 | 用途 |
+|------|------|
+| `spring-boot-starter-web` | REST 接口 + 内嵌 Tomcat |
+| `spring-boot-starter-security` | 认证鉴权框架 |
+| `spring-boot-starter-data-redis` | Redis 缓存 / 分布式锁 |
+| `spring-boot-starter-amqp` | RabbitMQ 消息队列 |
+| `spring-boot-starter-validation` | Bean Validation 参数校验 |
+| `spring-boot-starter-test` | 测试框架（含 JUnit 5 / MockMvc） |
+| `mybatis-plus-spring-boot3-starter` 3.5.9 | ORM 框架 |
+| `mybatis-plus-jsqlparser` 3.5.9 | 分页 SQL 解析（3.5.9 起独立模块） |
+| `mysql-connector-j` | MySQL 驱动（runtime） |
+| `knife4j-openapi3-jakarta-spring-boot-starter` 4.5.0 | Swagger 接口文档 |
+| `jjwt-api/impl/jackson` 0.12.6 | JWT 令牌签发 / 解析 |
+| `aliyun-sdk-oss` 3.18.1 | 阿里云 OSS 文件上传 |
+| `hutool-all` 5.8.30 | 通用工具库 |
+| `lombok` | 简化 getter/setter/构造器（optional） |
 
 ---
 
@@ -51,28 +52,45 @@ src/main/java/com/duyell/communityfreshdelivery/
 ├── CommunityFreshDeliveryApplication.java   ← 启动入口
 │
 ├── common/                                  ← 通用基础设施
+│   ├── config/
+│   │   └── SecurityConfig.java              ← Spring Security 配置（JWT 过滤链 + 权限）
 │   ├── exception/
 │   │   ├── BusinessException.java           ← 业务异常
-│   │   └── GlobalExceptionHandler.java      ← 全局异常拦截
+│   │   └── GlobalExceptionHandler.java      ← 全局异常拦截（含认证失败 401）
 │   ├── result/
 │   │   └── Result.java                      ← 统一响应体
-│   ├── utils/
-│   │   └── JwtUtil.java                     ← JWT 工具类
-│   └── security/
-│       ├── UserDetailsImpl.java             ← Spring Security 用户适配
-│       └── UserDetailsServiceImpl.java      ← 用户加载服务
+│   ├── security/
+│   │   ├── JwtAuthenticationFilter.java     ← JWT 认证过滤器
+│   │   ├── UserDetailsImpl.java             ← Spring Security 用户适配
+│   │   └── UserDetailsServiceImpl.java      ← 用户加载服务
+│   └── utils/
+│       └── JwtUtil.java                     ← JWT 工具类
 │
 ├── config/                                  ← Spring 配置
 │   ├── MybatisPlusConfig.java               ← MyBatis-Plus 分页插件
 │   └── Knife4jConfig.java                   ← Swagger 接口文档
 │
+├── controller/                              ← 接口层
+│   └── AuthController.java                  ← 认证接口（登录/注册）
+│
+├── dto/                                     ← 数据传输对象
+│   ├── LoginDTO.java                        ← 登录请求
+│   ├── LoginVO.java                         ← 登录响应
+│   ├── RegisterDTO.java                     ← 注册请求
+│   └── RegisterVO.java                      ← 注册响应
+│
 ├── entity/                                  ← 数据库实体
 │   ├── User.java                            ← user 表
 │   └── UserRole.java                        ← user_role 表
 │
-└── mapper/                                  ← MyBatis-Plus Mapper
-    ├── UserMapper.java                      ← 继承 BaseMapper<User>
-    └── UserRoleMapper.java                   ← 继承 BaseMapper<UserRole>
+├── mapper/                                  ← MyBatis-Plus Mapper
+│   ├── UserMapper.java                      ← 继承 BaseMapper<User> + selectByPhone()
+│   └── UserRoleMapper.java                  ← 继承 BaseMapper<UserRole>
+│
+└── service/                                 ← 业务层
+    ├── AuthService.java                     ← 认证服务接口
+    └── impl/
+        └── AuthServiceImpl.java             ← 认证服务实现
 ```
 
 ---
@@ -137,7 +155,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **注解** | `@Component` |
 | **功能** | 签发 / 解析 / 校验 JWT 令牌 |
 | **注入** | 构造注入 `app.jwt.secret`（签名密钥）+ `app.jwt.expiration`（有效期 ms） |
-| **方法** | `generateToken(userId, roles)` → 签发 token；`getUserIdFromToken(token)` → 提取 userId；`isTokenValid(token)` → 校验合法性与过期 |
+| **方法** | `generateToken(userId, roles)` → 签发 token；`getUserIdFromToken(token)` → 提取 userId；`getRolesFromToken(token)` → 提取角色列表；`isTokenValid(token)` → 校验合法性与过期 |
 | **库** | jjwt 0.12.6（`Jwts.builder()` / `Jwts.parser().verifyWith()`） |
 | **载荷** | `sub`=userId, `roles`=角色列表, `iat`=签发时间, `exp`=过期时间 |
 | **依赖方** | `AuthService`（签发）、`JwtAuthenticationFilter`（校验） |
@@ -167,22 +185,93 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **功能** | `loadUserByUsername(phone)` → 查 user 表得用户信息 + 查 user_role 表得角色列表 → 组装 UserDetailsImpl |
 | **异常** | 手机号未注册 → `UsernameNotFoundException` |
 
+#### 2.7 JWT 认证过滤器
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `JwtAuthenticationFilter.java` |
+| **包** | `common.security` |
+| **继承** | `OncePerRequestFilter`（保证每个请求只执行一次） |
+| **注入** | `JwtUtil`（`@RequiredArgsConstructor`） |
+| **功能** | 从 `Authorization: Bearer <token>` 头截取 JWT → 校验合法性 → 解析 userId + roles → 构建 `UserDetailsImpl` → 写入 `SecurityContextHolder` |
+| **关键设计** | 无状态（不查数据库，完全信任 JWT 载荷）；静默失败（token 不合法时不抛异常，由 SecurityConfig 返回 401） |
+
+#### 2.8 Spring Security 配置
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `SecurityConfig.java` |
+| **包** | `common.config` |
+| **注解** | `@Configuration` + `@EnableWebSecurity` |
+| **注入** | `JwtAuthenticationFilter` + `UserDetailsService` |
+| **Bean** | `SecurityFilterChain`（关闭 CSRF / 无状态 Session / 路由权限 / 注册 JWT 过滤器 / 401&403 JSON 响应）；`AuthenticationManager`；`PasswordEncoder`（BCrypt） |
+| **公开路径** | `/api/auth/login`、`/api/auth/register`、Knife4j 文档路径 |
+| **其余路径** | 一律要求认证 |
+
 ---
 
-### 3. Spring 配置 — `config/`
+### 3. 接口层 — `controller/`
 
-#### 3.1 MyBatis-Plus 配置
+#### 3.1 AuthController
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `AuthController.java` |
+| **包** | `controller` |
+| **注解** | `@RestController` + `@RequestMapping("/api/auth")` |
+| **注入** | `AuthService` |
+| **接口** | `POST /api/auth/login` — 手机号 + 密码登录；`POST /api/auth/register` — 新用户注册 |
+| **参数校验** | `@Valid` 自动触发 Bean Validation，校验失败由 `GlobalExceptionHandler` 统一返回 400 |
+
+---
+
+### 4. 业务层 — `service/`
+
+#### 4.1 AuthService 接口
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `AuthService.java` |
+| **包** | `service` |
+| **方法** | `login(LoginDTO)` → `LoginVO`；`register(RegisterDTO)` → `RegisterVO` |
+
+#### 4.2 AuthServiceImpl 实现
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `AuthServiceImpl.java` |
+| **包** | `service.impl` |
+| **注入** | `AuthenticationManager` + `JwtUtil` + `UserMapper` + `UserRoleMapper` + `PasswordEncoder` |
+| **登录链路** | `AuthenticationManager.authenticate()` → `UserDetailsServiceImpl.loadUserByUsername()` → `DaoAuthenticationProvider` 比对 BCrypt → 签发 JWT → 返回 `LoginVO` |
+| **注册链路** | `selectByPhone()` 校验唯一性 → BCrypt 加密 → INSERT user + INSERT user_role（`@Transactional`）→ 签发 JWT（注册即登录）→ 返回 `RegisterVO` |
+| **异常** | 手机号已注册 → `BusinessException(30001)`；认证失败 → `BadCredentialsException`（由 `GlobalExceptionHandler` 转 401） |
+
+---
+
+### 5. 数据传输对象 — `dto/`
+
+| 文件 | 用途 | 校验注解 |
+|------|------|---------|
+| `LoginDTO.java` | 登录请求 | `@NotBlank` phone / password |
+| `LoginVO.java` | 登录响应 | userId / phone / nickname / avatar / token / roles |
+| `RegisterDTO.java` | 注册请求 | `@NotBlank` + `@Pattern`（手机号）/ `@Size(6-20)`（密码）/ `@Size(max=50)`（昵称） |
+| `RegisterVO.java` | 注册响应 | userId / phone / nickname / token / roles（注册即登录） |
+
+---
+
+### 6. Spring 配置 — `config/`
+
+#### 6.1 MyBatis-Plus 配置
 
 | 项目 | 说明 |
 |------|------|
 | **文件** | `MybatisPlusConfig.java` |
 | **包** | `config` |
 | **注解** | `@Configuration` |
-| **功能** | 注册 `MybatisPlusInterceptor`，仅启用分页插件（MySQL 方言） |
+| **功能** | 注册 `MybatisPlusInterceptor`，仅启用分页插件（MySQL 方言）。SqlSessionFactory 和 Mapper 扫描由 starter 自动配置 |
 | **扩展** | 后续可追加乐观锁、防全表更新/删除等拦截器 |
-| **依赖** | `mybatis-plus-jsqlparser:3.5.9`（分页插件 3.5.9 起独立模块） |
 
-#### 3.2 接口文档配置
+#### 6.2 接口文档配置
 
 | 项目 | 说明 |
 |------|------|
@@ -195,9 +284,9 @@ src/main/java/com/duyell/communityfreshdelivery/
 
 ---
 
-### 4. 资源文件
+### 7. 资源文件
 
-#### 4.1 应用配置
+#### 7.1 应用配置
 
 | 项目 | 说明 |
 |------|------|
@@ -205,22 +294,20 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **路径** | `src/main/resources/` |
 | **内容** | 端口（8080）、MySQL 数据源、Redis（Lettuce 连接池）、RabbitMQ（手动 ACK）、文件上传限制、MyBatis-Plus 配置（驼峰/逻辑删除/ID 自增）、Knife4j 启用、`app:` 自定义配置（OSS / JWT / 业务参数） |
 
-#### 4.2 数据库初始化
+#### 7.2 数据库初始化
 
 | 项目 | 说明 |
 |------|------|
 | **文件** | `init.sql` |
 | **路径** | `src/main/resources/` |
-| **内容** | 建库 + 18 张业务表（含索引/注释）+ 初始数据（4 个测试用户 + 角色 + 6 条系统配置） |
+| **内容** | 建库 + 19 张业务表（含索引/注释）+ 初始数据（4 个测试用户 + 角色 + 6 条系统配置） |
 | **规范** | 阿里巴巴规范（无外键/无级联）、逻辑删除、金额 DECIMAL(10,2)、订单编号=14位时间戳+8位随机码 |
 
 ---
 
----
+### 8. 数据库实体 — `entity/`
 
-### 5. 数据库实体 — `entity/`
-
-#### 5.1 User
+#### 8.1 User
 
 | 项目 | 说明 |
 |------|------|
@@ -230,7 +317,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **逻辑删除** | `deleted`（`@TableLogic`） |
 | **字段** | id / phone / password / nickname / avatar / status / createTime / updateTime / deleted |
 
-#### 5.2 UserRole
+#### 8.2 UserRole
 
 | 项目 | 说明 |
 |------|------|
@@ -240,17 +327,18 @@ src/main/java/com/duyell/communityfreshdelivery/
 
 ---
 
-### 6. Mapper 接口 — `mapper/`
+### 9. Mapper 接口 — `mapper/`
 
-#### 6.1 UserMapper
+#### 9.1 UserMapper
 
 | 项目 | 说明 |
 |------|------|
 | **文件** | `UserMapper.java` |
 | **继承** | `BaseMapper<User>` |
 | **注解** | `@Mapper` |
+| **自定义方法** | `selectByPhone(String phone)` — 根据手机号查用户（`@Select` 注解 SQL） |
 
-#### 6.2 UserRoleMapper
+#### 9.2 UserRoleMapper
 
 | 项目 | 说明 |
 |------|------|
@@ -260,22 +348,10 @@ src/main/java/com/duyell/communityfreshdelivery/
 
 ---
 
-### 7. 测试
+### 10. 测试
 
-| 项目 | 说明 |
+| 文件 | 功能 |
 |------|------|
-| **文件** | `EnvironmentCheckTest.java` |
-| **路径** | `src/test/java/com/duyell/communityfreshdelivery/` |
-| **功能** | 环境连通性全检 — MySQL / Redis / RabbitMQ / OSS，4 项全部通过 |
-
----
-
-## 当前待扩展包（空目录）
-
-| 包 | 计划内容 |
-|------|------|
-| `config/` | 后续追加 `SecurityConfig.java` |
-| `common/security/` | 后续追加 `JwtAuthenticationFilter.java` |
-| `controller/` | 各端 Controller |
-| `service/` | Service 接口 + 实现 |
-| `dto/` | 请求/响应 DTO |
+| `EnvironmentCheckTest.java` | 环境连通性全检 — MySQL / Redis / RabbitMQ / OSS |
+| `BcryptPasswordGeneratorTest.java` | 生成 "123456" 的 BCrypt hash，输出到控制台供 init.sql 使用 |
+| `AuthRegisterTest.java` | 注册流程集成测试（`@SpringBootTest`，直调 Service） |

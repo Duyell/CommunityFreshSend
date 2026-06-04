@@ -51,6 +51,9 @@
 | | UserMapper.selectByPhone 修复 | 添加 @Param("phone") 注解，解决无 -parameters 编译时 MyBatis 参数名解析失败问题 |
 | | 端到端回归测试 | 注册 → 登录 → 错误密码 → 重复注册 → 登出 → Redis 黑名单验证，全部通过 |
 | | 分类树查询接口 | GET /api/category/tree，全表查内存组装，无限递归查询；测试数据 14 条（3 一级 + 11 子级） |
+| | 商品 CRUD（商家端） | Product + ProductSku 主子表事务，创建/编辑/上下架/删除/详情/分页列表，@PreAuthorize 鉴权，SKU 先删后插 |
+| | 方法级鉴权 | SecurityConfig 加 @EnableMethodSecurity，GlobalExceptionHandler 加 AccessDeniedException 处理 |
+| | 端到端测试 | 分类树 + 商品 CRUD 全接口 + 鉴权（无token/普通用户/商家）全部通过 |
 
 ---
 
@@ -88,12 +91,12 @@
 ## 第三步 商品模块（进行中）
 
 - [x] **3.1** 分类接口 — 分类树查询（GET /api/category/tree）
-- [ ] **3.2** 商品 CRUD — 商家端商品管理
+- [x] **3.2** 商品 CRUD — 商家端商品管理（创建/编辑/上下架/删除/详情/分页 + 鉴权）
 - [ ] **3.3** 商品列表 — 用户端分类浏览 + 搜索
 
 ---
 
 ## 下次待做
 
-- [ ] 3.2 商品 CRUD
+- [ ] 3.3 商品列表（用户端）
 

@@ -71,31 +71,40 @@ src/main/java/com/duyell/communityfreshdelivery/
 │
 ├── controller/                              ← 接口层
 │   ├── AuthController.java                  ← 认证接口（登录/注册/登出）
-│   └── CategoryController.java              ← 分类接口（分类树查询）
+│   ├── CategoryController.java              ← 分类接口（分类树查询）
+│   └── ProductController.java               ← 商品接口（CRUD + 分页）
 │
 ├── dto/                                     ← 数据传输对象
 │   ├── LoginDTO.java                        ← 登录请求
 │   ├── LoginVO.java                         ← 登录响应
 │   ├── RegisterDTO.java                     ← 注册请求
 │   ├── RegisterVO.java                      ← 注册响应
-│   └── CategoryVO.java                      ← 分类树节点
+│   ├── CategoryVO.java                      ← 分类树节点
+│   ├── ProductSaveDTO.java                  ← 商品创建/编辑请求（含 SKU） 
+│   └── ProductVO.java                       ← 商品响应（含 SKU）
 │
 ├── entity/                                  ← 数据库实体
 │   ├── User.java                            ← user 表
 │   ├── UserRole.java                        ← user_role 表
-│   └── Category.java                        ← category 表
+│   ├── Category.java                        ← category 表
+│   ├── Product.java                         ← product 表
+│   └── ProductSku.java                      ← product_sku 表
 │
 ├── mapper/                                  ← MyBatis-Plus Mapper
 │   ├── UserMapper.java                      ← 继承 BaseMapper<User> + selectByPhone()
 │   ├── UserRoleMapper.java                  ← 继承 BaseMapper<UserRole>
-│   └── CategoryMapper.java                  ← 继承 BaseMapper<Category>
+│   ├── CategoryMapper.java                  ← 继承 BaseMapper<Category>
+│   ├── ProductMapper.java                   ← 继承 BaseMapper<Product>
+│   └── ProductSkuMapper.java                ← 继承 BaseMapper<ProductSku> + deleteByProductId()
 │
 └── service/                                 ← 业务层
     ├── AuthService.java                     ← 认证服务接口
     ├── CategoryService.java                 ← 分类服务接口
+    ├── ProductService.java                  ← 商品服务接口
     └── impl/
         ├── AuthServiceImpl.java             ← 认证服务实现
-        └── CategoryServiceImpl.java         ← 分类服务实现
+        ├── CategoryServiceImpl.java         ← 分类服务实现
+        └── ProductServiceImpl.java          ← 商品服务实现
 ```
 
 ---
@@ -148,7 +157,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **包** | `common.exception` |
 | **注解** | `@RestControllerAdvice` |
 | **功能** | 拦截所有 Controller 抛出的异常，统一包装为 `Result` 返回 |
-| **拦截类型** | `BusinessException` → warn 日志 + 返回业务消息；`AuthenticationException` → warn 日志 + 返回"手机号或密码错误"；`MethodArgumentNotValidException` → 拼接字段级校验错误；`Exception` → error 日志 + 兜底"服务器内部错误" |
+| **拦截类型** | `BusinessException` → 业务消息；`AuthenticationException` → "手机号或密码错误"；`AccessDeniedException` → "权限不足"；`MethodArgumentNotValidException` → 字段校验错误；`Exception` → 兜底"服务器内部错误" |
 | **扩展** | 后续可新增 `@ExceptionHandler` 方法拦截特定异常 |
 
 #### 2.4 JWT 工具类
@@ -227,6 +236,16 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **注入** | `CategoryService` |
 | **接口** | `GET /api/category/tree` — 获取分类树（公开接口，无需认证） |
 
+#### 3.3 ProductController
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `ProductController.java` |
+| **包** | `controller` |
+| **注解** | `@RestController` + `@RequestMapping("/api/product")` |
+| **注入** | `ProductService` |
+| **接口** | `POST /api/product` — 创建（@PreAuthorize ROLE_MERCHANT）；`PUT /api/product/{id}` — 编辑；`PUT /api/product/{id}/status` — 上下架；`DELETE /api/product/{id}` — 删除；`GET /api/product/{id}` — 详情（公开）；`GET /api/product/page` — 分页列表（@PreAuthorize） |
+
 ---
 
 ### 4. 业务层 — `service/`
@@ -269,6 +288,24 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **功能** | 一次性查全表（按 sort 排序）→ 按 parentId 分组 → 递归组装 CategoryVO 树 |
 | **设计要点** | 不做递归 SQL（N+1），分类总量有限全量加载无性能问题 |
 
+#### 4.5 ProductService 接口
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `ProductService.java` |
+| **包** | `service` |
+| **方法** | `create/update/updateStatus/delete/getById/page` |
+
+#### 4.6 ProductServiceImpl 实现
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `ProductServiceImpl.java` |
+| **包** | `service.impl` |
+| **注入** | `ProductMapper` + `ProductSkuMapper` |
+| **关键设计** | 主子表事务（create/update）、SKU 先删后插、软删除（@TableLogic）、分页列表取最低售价 |
+| **异常** | 商品不存在 → `BusinessException(10001)` |
+
 ---
 
 ### 5. 数据传输对象 — `dto/`
@@ -280,6 +317,8 @@ src/main/java/com/duyell/communityfreshdelivery/
 | `RegisterDTO.java` | 注册请求 | `@NotBlank` + `@Pattern`（手机号）/ `@Size(6-20)`（密码）/ `@Size(max=50)`（昵称） |
 | `RegisterVO.java` | 注册响应 | userId / phone / nickname / token / roles（注册即登录） |
 | `CategoryVO.java` | 分类树节点 | id / name / sort / children（递归结构，前端直接渲染级联菜单） |
+| `ProductSaveDTO.java` | 商品创建/编辑请求 | categoryId / name / description / images / isWeighted / skus（内嵌 SkuItem 列表） |
+| `ProductVO.java` | 商品响应 | id / name / status / minPrice / skus（内嵌 SkuVO 列表），列表页 skus 不填充 |
 
 ---
 
@@ -291,9 +330,10 @@ src/main/java/com/duyell/communityfreshdelivery/
 |------|------|
 | **文件** | `SecurityConfig.java` |
 | **包** | `config` |
-| **注解** | `@Configuration` + `@EnableWebSecurity` |
+| **注解** | `@Configuration` + `@EnableWebSecurity` + `@EnableMethodSecurity` |
 | **注入** | `JwtAuthenticationFilter` |
-| **Bean** | `SecurityFilterChain`（关闭 CSRF / 无状态 Session / 路由权限 / 注册 JWT 过滤器 / 401&403 JSON 响应）；`AuthenticationManager`；`PasswordEncoder`（BCrypt） |
+| **Bean** | `SecurityFilterChain`（关闭 CSRF / 无状态 Session / URL 层放行公开路径 / 注册 JWT 过滤器 / 401&403 JSON 响应）；`AuthenticationManager`；`PasswordEncoder`（BCrypt） |
+| **方法安全** | `@EnableMethodSecurity` 启用 `@PreAuthorize`，Controller 层按角色控制（如 `hasRole('MERCHANT')`） |
 | **公开路径** | `/api/auth/login`、`/api/auth/register`、`/api/auth/logout`、Knife4j 文档路径 |
 | **其余路径** | 一律要求认证 |
 
@@ -371,6 +411,22 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **逻辑删除** | `deleted`（`@TableLogic`） |
 | **字段** | id / parentId（0=一级分类） / name / sort / status（1=启用 0=停用） / createTime / updateTime / deleted |
 
+#### 8.4 Product
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `Product.java` |
+| **映射** | `@TableName("product")` |
+| **字段** | id / categoryId / name / description / images（JSON 数组字符串）/ status（1=上架 2=下架 3=售罄）/ isWeighted（0=固定规格 1=称重）/ createTime / updateTime / deleted |
+
+#### 8.5 ProductSku
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `ProductSku.java` |
+| **映射** | `@TableName("product_sku")` |
+| **字段** | id / productId / specName / price（DECIMAL）/ stock / stockThreshold / status / createTime / updateTime / deleted |
+
 ---
 
 ### 9. Mapper 接口 — `mapper/`
@@ -399,6 +455,23 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **文件** | `CategoryMapper.java` |
 | **继承** | `BaseMapper<Category>` |
 | **注解** | `@Mapper` |
+
+#### 9.4 ProductMapper
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `ProductMapper.java` |
+| **继承** | `BaseMapper<Product>` |
+| **注解** | `@Mapper` |
+
+#### 9.5 ProductSkuMapper
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `ProductSkuMapper.java` |
+| **继承** | `BaseMapper<ProductSku>` |
+| **注解** | `@Mapper` |
+| **自定义方法** | `deleteByProductId(productId)` — 物理删除商品下所有 SKU（@Delete 注解，用于编辑时"先删后插"） |
 
 ---
 

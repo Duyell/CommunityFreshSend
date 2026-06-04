@@ -2,6 +2,7 @@ package com.duyell.communityfreshdelivery.common.exception;
 
 import com.duyell.communityfreshdelivery.common.result.Result;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -62,6 +63,16 @@ public class GlobalExceptionHandler {
     public Result<?> handleAuthenticationException(AuthenticationException e) {
         log.warn("登录认证失败: {}", e.getMessage());
         return Result.fail(401, "手机号或密码错误");
+    }
+
+    /**
+     * 权限不足 — 未登录或角色不匹配.
+     * <p>由 {@code @PreAuthorize} 或方法安全拦截器抛出.</p>
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public Result<?> handleAccessDeniedException(AccessDeniedException e) {
+        log.warn("权限不足: {}", e.getMessage());
+        return Result.fail(403, "权限不足");
     }
 
     /**

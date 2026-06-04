@@ -417,6 +417,21 @@ INSERT INTO `category` (`id`, `parent_id`, `name`, `sort`) VALUES
 (13, 9, '蛋类',     4),
 (14, 9, '乳制品',   5);
 
+-- 测试商品（商家 ID=3 管理）
+INSERT INTO `product` (`id`, `category_id`, `name`, `description`, `images`, `status`, `is_weighted`) VALUES
+(1, 2, '盒装草莓',    '新鲜丹东99草莓，300g/盒',   '["strawberry1.jpg"]', 1, 0),
+(2, 2, '菲律宾菠萝',  '酸甜多汁，整颗约1.5kg',    '["pineapple1.jpg"]',  1, 1),
+(3, 6, '有机生菜',    '无公害有机生菜，约 250g/颗', '["lettuce1.jpg"]',   1, 0),
+(4, 10, '猪五花肉',   '当日鲜切，肥瘦均匀',        '["pork1.jpg"]',       1, 0);
+
+-- 商品规格
+INSERT INTO `product_sku` (`product_id`, `spec_name`, `price`, `stock`) VALUES
+(1, '300g/盒',  19.90, 100),
+(1, '500g/盒',  29.90, 50),
+(2, '散称（约1.5kg/个）', 8.00, 200),
+(3, '250g/颗',   5.90, 150),
+(4, '500g/份',  22.00, 80);
+
 -- 测试用户（密码明文均为 "123456"，hash 由 BcryptPasswordGeneratorTest 生成）
 INSERT INTO `user` (`id`, `phone`, `password`, `nickname`) VALUES
 (1, '13800000001', '$2a$10$kq4ydwt54PVMpyJrO3FFUOjo/JfjfB/n7l3G5U4SVWCy90axuxUqu', '测试居民'),

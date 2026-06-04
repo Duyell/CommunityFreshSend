@@ -50,6 +50,7 @@
 | | Token 提取统一 | extractBearerToken 收敛到 JwtUtil（public static），JwtAuthenticationFilter 和 AuthController 共用同一入口 |
 | | UserMapper.selectByPhone 修复 | 添加 @Param("phone") 注解，解决无 -parameters 编译时 MyBatis 参数名解析失败问题 |
 | | 端到端回归测试 | 注册 → 登录 → 错误密码 → 重复注册 → 登出 → Redis 黑名单验证，全部通过 |
+| | 分类树查询接口 | GET /api/category/tree，全表查内存组装，无限递归查询；测试数据 14 条（3 一级 + 11 子级） |
 
 ---
 
@@ -84,9 +85,9 @@
 
 ---
 
-## 第三步 商品模块（待开始）
+## 第三步 商品模块（进行中）
 
-- [ ] **3.1** 分类接口 — 分类树查询
+- [x] **3.1** 分类接口 — 分类树查询（GET /api/category/tree）
 - [ ] **3.2** 商品 CRUD — 商家端商品管理
 - [ ] **3.3** 商品列表 — 用户端分类浏览 + 搜索
 
@@ -94,5 +95,5 @@
 
 ## 下次待做
 
-- [ ] 3.1 商品分类接口
+- [ ] 3.2 商品 CRUD
 

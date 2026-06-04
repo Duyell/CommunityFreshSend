@@ -400,6 +400,23 @@ CREATE TABLE `operation_log` (
 -- 初始数据
 -- ============================================
 
+-- 商品分类
+INSERT INTO `category` (`id`, `parent_id`, `name`, `sort`) VALUES
+(1,  0, '水果',     1),
+(2,  1, '热带水果',  1),
+(3,  1, '浆果类',    2),
+(4,  1, '柑橘类',    3),
+(5,  0, '蔬菜',     2),
+(6,  5, '叶菜类',    1),
+(7,  5, '根茎类',    2),
+(8,  5, '茄果类',    3),
+(9,  0, '肉禽蛋奶',  3),
+(10, 9, '猪肉',     1),
+(11, 9, '牛肉',     2),
+(12, 9, '禽类',     3),
+(13, 9, '蛋类',     4),
+(14, 9, '乳制品',   5);
+
 -- 测试用户（密码明文均为 "123456"，hash 由 BcryptPasswordGeneratorTest 生成）
 INSERT INTO `user` (`id`, `phone`, `password`, `nickname`) VALUES
 (1, '13800000001', '$2a$10$kq4ydwt54PVMpyJrO3FFUOjo/JfjfB/n7l3G5U4SVWCy90axuxUqu', '测试居民'),

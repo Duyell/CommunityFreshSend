@@ -70,26 +70,32 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   └── Knife4jConfig.java                   ← Swagger 接口文档
 │
 ├── controller/                              ← 接口层
-│   └── AuthController.java                  ← 认证接口（登录/注册/登出）
+│   ├── AuthController.java                  ← 认证接口（登录/注册/登出）
+│   └── CategoryController.java              ← 分类接口（分类树查询）
 │
 ├── dto/                                     ← 数据传输对象
 │   ├── LoginDTO.java                        ← 登录请求
 │   ├── LoginVO.java                         ← 登录响应
 │   ├── RegisterDTO.java                     ← 注册请求
-│   └── RegisterVO.java                      ← 注册响应
+│   ├── RegisterVO.java                      ← 注册响应
+│   └── CategoryVO.java                      ← 分类树节点
 │
 ├── entity/                                  ← 数据库实体
 │   ├── User.java                            ← user 表
-│   └── UserRole.java                        ← user_role 表
+│   ├── UserRole.java                        ← user_role 表
+│   └── Category.java                        ← category 表
 │
 ├── mapper/                                  ← MyBatis-Plus Mapper
 │   ├── UserMapper.java                      ← 继承 BaseMapper<User> + selectByPhone()
-│   └── UserRoleMapper.java                  ← 继承 BaseMapper<UserRole>
+│   ├── UserRoleMapper.java                  ← 继承 BaseMapper<UserRole>
+│   └── CategoryMapper.java                  ← 继承 BaseMapper<Category>
 │
 └── service/                                 ← 业务层
     ├── AuthService.java                     ← 认证服务接口
+    ├── CategoryService.java                 ← 分类服务接口
     └── impl/
-        └── AuthServiceImpl.java             ← 认证服务实现
+        ├── AuthServiceImpl.java             ← 认证服务实现
+        └── CategoryServiceImpl.java         ← 分类服务实现
 ```
 
 ---
@@ -211,6 +217,16 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **接口** | `POST /api/auth/login` — 登录；`POST /api/auth/register` — 注册；`POST /api/auth/logout` — 登出（token 加入 Redis 黑名单） |
 | **参数校验** | `@Valid` 自动触发 Bean Validation，校验失败由 `GlobalExceptionHandler` 统一返回 400 |
 
+#### 3.2 CategoryController
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `CategoryController.java` |
+| **包** | `controller` |
+| **注解** | `@RestController` + `@RequestMapping("/api/category")` |
+| **注入** | `CategoryService` |
+| **接口** | `GET /api/category/tree` — 获取分类树（公开接口，无需认证） |
+
 ---
 
 ### 4. 业务层 — `service/`
@@ -235,6 +251,24 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **登出链路** | 校验 token 有效性 → 计算剩余过期时间 → 写入 Redis 黑名单（TTL 与 token 同步） |
 | **异常** | 手机号已注册 → `BusinessException(30001)`；认证失败 → `BadCredentialsException`（由 `GlobalExceptionHandler` 转 401） |
 
+#### 4.3 CategoryService 接口
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `CategoryService.java` |
+| **包** | `service` |
+| **方法** | `getCategoryTree()` → `List<CategoryVO>` |
+
+#### 4.4 CategoryServiceImpl 实现
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `CategoryServiceImpl.java` |
+| **包** | `service.impl` |
+| **注入** | `CategoryMapper` |
+| **功能** | 一次性查全表（按 sort 排序）→ 按 parentId 分组 → 递归组装 CategoryVO 树 |
+| **设计要点** | 不做递归 SQL（N+1），分类总量有限全量加载无性能问题 |
+
 ---
 
 ### 5. 数据传输对象 — `dto/`
@@ -245,6 +279,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | `LoginVO.java` | 登录响应 | userId / phone / nickname / avatar / token / roles |
 | `RegisterDTO.java` | 注册请求 | `@NotBlank` + `@Pattern`（手机号）/ `@Size(6-20)`（密码）/ `@Size(max=50)`（昵称） |
 | `RegisterVO.java` | 注册响应 | userId / phone / nickname / token / roles（注册即登录） |
+| `CategoryVO.java` | 分类树节点 | id / name / sort / children（递归结构，前端直接渲染级联菜单） |
 
 ---
 
@@ -326,6 +361,16 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **映射** | `@TableName("user_role")` |
 | **字段** | id / userId / role / createTime / deleted |
 
+#### 8.3 Category
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `Category.java` |
+| **映射** | `@TableName("category")` |
+| **主键** | `id` 自增（`@TableId(type = IdType.AUTO)`） |
+| **逻辑删除** | `deleted`（`@TableLogic`） |
+| **字段** | id / parentId（0=一级分类） / name / sort / status（1=启用 0=停用） / createTime / updateTime / deleted |
+
 ---
 
 ### 9. Mapper 接口 — `mapper/`
@@ -345,6 +390,14 @@ src/main/java/com/duyell/communityfreshdelivery/
 |------|------|
 | **文件** | `UserRoleMapper.java` |
 | **继承** | `BaseMapper<UserRole>` |
+| **注解** | `@Mapper` |
+
+#### 9.3 CategoryMapper
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `CategoryMapper.java` |
+| **继承** | `BaseMapper<Category>` |
 | **注解** | `@Mapper` |
 
 ---

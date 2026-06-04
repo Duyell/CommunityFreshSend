@@ -51,6 +51,8 @@ public class SecurityConfig {
             "/api/auth/login",
             "/api/auth/register",
             "/api/auth/logout",
+            // 商品浏览 — 公开
+            "/api/category/**",
             // Knife4j
             "/doc.html",
             "/swagger-ui/**",

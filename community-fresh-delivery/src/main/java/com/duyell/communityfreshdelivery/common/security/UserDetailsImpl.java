@@ -41,15 +41,20 @@ public class UserDetailsImpl implements UserDetails {
     @NonNull
     private final List<String> roles;
 
+    /** 账号是否启用（对应 user 表 status 字段：1=正常 0=禁用） */
+    private final boolean enabled;
+
     /**
      * @param userId   用户 ID
-     * @param password 加密后的密码（BCrypt 密文）
+     * @param password 加密后的密码（BCrypt 密文），JWT 认证时为 null
      * @param roles    角色列表，含 {@code ROLE_} 前缀
+     * @param enabled  账号是否启用（{@code true}=正常，{@code false}=禁用）
      */
-    public UserDetailsImpl(Long userId, String password, List<String> roles) {
+    public UserDetailsImpl(Long userId, String password, List<String> roles, boolean enabled) {
         this.userId = userId;
         this.password = password;
         this.roles = roles;
+        this.enabled = enabled;
     }
 
     /**
@@ -97,6 +102,6 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return enabled;
     }
 }

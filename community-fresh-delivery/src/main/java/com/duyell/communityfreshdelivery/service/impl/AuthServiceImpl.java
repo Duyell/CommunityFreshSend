@@ -14,6 +14,7 @@ import com.duyell.communityfreshdelivery.dto.LoginVO;
 import com.duyell.communityfreshdelivery.dto.RegisterVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -42,6 +44,10 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
+    private final StringRedisTemplate redisTemplate;
+
+    /** Redis 中 JWT 黑名单的 key 前缀 */
+    private static final String JWT_BLACKLIST_PREFIX = "jwt:blacklist:";
 
     @Override
     public LoginVO login(LoginDTO dto) {
@@ -110,5 +116,24 @@ public class AuthServiceImpl implements AuthService {
                 .token(token)
                 .roles(roles)
                 .build();
+    }
+
+    @Override
+    public void logout(String token) {
+        // token 缺失、无效或已过期 → 无需加入黑名单，静默返回
+        if (token == null || !jwtUtil.isTokenValid(token)) {
+            log.debug("登出：token 缺失或已无效，跳过");
+            return;
+        }
+
+        long remaining = jwtUtil.getRemainingExpiration(token);
+        if (remaining <= 0) {
+            log.debug("登出：token 剩余时间为 0，跳过");
+            return;
+        }
+
+        String key = JWT_BLACKLIST_PREFIX + token;
+        redisTemplate.opsForValue().set(key, "1", Duration.ofMillis(remaining));
+        log.info("登出成功：token 已加入黑名单，{}ms 后自动清理", remaining);
     }
 }

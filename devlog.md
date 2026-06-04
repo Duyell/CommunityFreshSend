@@ -44,8 +44,12 @@
 | | JWT 认证过滤器 + SecurityConfig | JwtAuthenticationFilter + SecurityConfig（无状态 + 路由权限 + 401/403 JSON） |
 | | 登录 & 注册接口全链路 | POST /api/auth/login + /register，AuthenticationManager + BCrypt + JWT |
 | | Spring Boot 降级 4.0.6→3.4.7 | mybatis-plus-spring-boot3-starter 不兼容 Boot 4，降级后删手动装配 |
-| | 端到端测试 | curl 测试全部通过（注册/重复注册/正确密码/错误密码/参数校验） |
-| | 包整理 | vo 包合并到 dto，减少过度拆分 |
+| 2026-06-04 | 包结构整理 | SecurityConfig 从 common/config 移至 config，消除双 config 包，所有配置类统一收归 config 包 |
+| | 登录安全加固 | UserDetailsImpl.isEnabled() 对接 user.status 字段，禁用用户（status=0）无法登录，DaoAuthenticationProvider 前置检查拦截 |
+| | JWT 登出功能 | Redis 黑名单方案：POST /api/auth/logout → token 写入 Redis（TTL 与 JWT 同步），JwtAuthenticationFilter 每次请求前查黑名单 |
+| | Token 提取统一 | extractBearerToken 收敛到 JwtUtil（public static），JwtAuthenticationFilter 和 AuthController 共用同一入口 |
+| | UserMapper.selectByPhone 修复 | 添加 @Param("phone") 注解，解决无 -parameters 编译时 MyBatis 参数名解析失败问题 |
+| | 端到端回归测试 | 注册 → 登录 → 错误密码 → 重复注册 → 登出 → Redis 黑名单验证，全部通过 |
 
 ---
 
@@ -73,7 +77,9 @@
 - [x] **2.6** SecurityConfig 安全配置
 - [x] **2.7** AuthController 登录接口
 - [x] **2.8** AuthController 注册接口
-- [x] 端到端测试 → 注册/登录/校验全部通过
+- [x] **2.9** 禁用用户拦截 — `isEnabled()` 对接 `user.status`
+- [x] **2.10** JWT 登出 — Redis 黑名单 + 过滤器拦截
+- [x] 端到端回归测试 → 注册/登录/错误密码/重复注册/登出/黑名单验证，全部通过
 - [x] Spring Boot 版本稳定 → 降级 3.4.7，去除手动装配补丁
 
 ---

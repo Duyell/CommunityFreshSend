@@ -1,6 +1,7 @@
 package com.duyell.communityfreshdelivery.controller;
 
 import com.duyell.communityfreshdelivery.common.result.Result;
+import com.duyell.communityfreshdelivery.common.utils.JwtUtil;
 import com.duyell.communityfreshdelivery.dto.LoginDTO;
 import com.duyell.communityfreshdelivery.dto.RegisterDTO;
 import com.duyell.communityfreshdelivery.service.AuthService;
@@ -8,6 +9,7 @@ import com.duyell.communityfreshdelivery.dto.LoginVO;
 import com.duyell.communityfreshdelivery.dto.RegisterVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,5 +62,22 @@ public class AuthController {
     public Result<RegisterVO> register(@Valid @RequestBody RegisterDTO dto) {
         RegisterVO vo = authService.register(dto);
         return Result.ok("注册成功", vo);
+    }
+
+    /**
+     * 登出，将当前 token 加入 Redis 黑名单，使其即时失效.
+     *
+     * <p>从 {@code Authorization: Bearer <token>} 头中提取 token.
+     * token 不存在或已过期时静默成功（幂等）.</p>
+     *
+     * @param request HTTP 请求
+     * @return 登出成功
+     */
+    @PostMapping("/logout")
+    @Operation(summary = "登出")
+    public Result<Void> logout(HttpServletRequest request) {
+        String token = JwtUtil.extractBearerToken(request);
+        authService.logout(token);
+        return Result.ok("已登出", null);
     }
 }

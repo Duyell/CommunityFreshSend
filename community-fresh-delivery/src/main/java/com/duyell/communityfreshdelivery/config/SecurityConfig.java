@@ -1,4 +1,4 @@
-package com.duyell.communityfreshdelivery.common.config;
+package com.duyell.communityfreshdelivery.config;
 
 import com.duyell.communityfreshdelivery.common.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +8,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,6 +50,7 @@ public class SecurityConfig {
     private static final String[] PERMIT_ALL_PATHS = {
             "/api/auth/login",
             "/api/auth/register",
+            "/api/auth/logout",
             // Knife4j
             "/doc.html",
             "/swagger-ui/**",
@@ -62,7 +64,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 // 1. 关闭 CSRF — JWT 天然防跨站，无需 CSRF token
-                .csrf(csrf -> csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable)
 
                 // 2. 无状态会话 — 不创建 HttpSession，每次请求独立认证
                 .sessionManagement(session ->

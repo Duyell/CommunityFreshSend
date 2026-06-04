@@ -3,6 +3,7 @@ package com.duyell.communityfreshdelivery.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.duyell.communityfreshdelivery.entity.User;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 /**
@@ -24,5 +25,5 @@ public interface UserMapper extends BaseMapper<User> {
      * @return User 实体，不存在时返回 {@code null}
      */
     @Select("SELECT * FROM user WHERE phone = #{phone} AND deleted = 0 LIMIT 1")
-    User selectByPhone(String phone);
+    User selectByPhone(@Param("phone") String phone);
 }

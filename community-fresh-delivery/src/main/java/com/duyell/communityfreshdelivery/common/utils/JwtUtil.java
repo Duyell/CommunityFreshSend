@@ -7,8 +7,10 @@ import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SecurityException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -111,6 +113,24 @@ public class JwtUtil {
     }
 
     /**
+     * 获取 token 的剩余有效时间.
+     *
+     * <p>用于登出时设置 Redis 黑名单的 TTL，确保黑名单条目与 token 同时过期.</p>
+     *
+     * @param token JWT 字符串，调用方需确保已通过 {@link #isTokenValid} 校验
+     * @return 剩余有效时间（毫秒），token 已过期时返回 0
+     */
+    public long getRemainingExpiration(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            long remaining = claims.getExpiration().getTime() - System.currentTimeMillis();
+            return Math.max(remaining, 0);
+        } catch (ExpiredJwtException e) {
+            return 0;
+        }
+    }
+
+    /**
      * 校验 token 是否合法且在有效期内.
      *
      * @param token JWT 字符串
@@ -127,6 +147,27 @@ public class JwtUtil {
         }
         return false;
     }
+
+    /**
+     * 从 HTTP 请求的 Authorization 头中提取 Bearer token.
+     *
+     * <p>供 {@code JwtAuthenticationFilter} 和 {@code AuthController} 统一使用，
+     * 避免多处重复截取字符串.</p>
+     *
+     * @param request HTTP 请求
+     * @return token 字符串，不存在或格式不对时返回 {@code null}
+     */
+    @Nullable
+    public static String extractBearerToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith(BEARER_PREFIX)) {
+            return header.substring(BEARER_PREFIX_LEN);
+        }
+        return null;
+    }
+
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final int BEARER_PREFIX_LEN = BEARER_PREFIX.length();
 
     /**
      * 解析 token 并返回 Claims，内部统一处理各类 JWT 异常.

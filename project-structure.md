@@ -2,7 +2,7 @@
 # 项目结构文档
 
 > 社区生鲜配送系统 — 完整项目文件索引与功能说明  
-> 更新日期：2026-06-03
+> 更新日期：2026-06-04
 
 ---
 
@@ -52,8 +52,6 @@ src/main/java/com/duyell/communityfreshdelivery/
 ├── CommunityFreshDeliveryApplication.java   ← 启动入口
 │
 ├── common/                                  ← 通用基础设施
-│   ├── config/
-│   │   └── SecurityConfig.java              ← Spring Security 配置（JWT 过滤链 + 权限）
 │   ├── exception/
 │   │   ├── BusinessException.java           ← 业务异常
 │   │   └── GlobalExceptionHandler.java      ← 全局异常拦截（含认证失败 401）
@@ -67,11 +65,12 @@ src/main/java/com/duyell/communityfreshdelivery/
 │       └── JwtUtil.java                     ← JWT 工具类
 │
 ├── config/                                  ← Spring 配置
+│   ├── SecurityConfig.java                  ← Spring Security 配置（JWT 过滤链 + 权限）
 │   ├── MybatisPlusConfig.java               ← MyBatis-Plus 分页插件
 │   └── Knife4jConfig.java                   ← Swagger 接口文档
 │
 ├── controller/                              ← 接口层
-│   └── AuthController.java                  ← 认证接口（登录/注册）
+│   └── AuthController.java                  ← 认证接口（登录/注册/登出）
 │
 ├── dto/                                     ← 数据传输对象
 │   ├── LoginDTO.java                        ← 登录请求
@@ -143,7 +142,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **包** | `common.exception` |
 | **注解** | `@RestControllerAdvice` |
 | **功能** | 拦截所有 Controller 抛出的异常，统一包装为 `Result` 返回 |
-| **拦截类型** | `BusinessException` → warn 日志 + 返回业务消息；`MethodArgumentNotValidException` → 拼接字段级校验错误；`Exception` → error 日志 + 兜底"服务器内部错误" |
+| **拦截类型** | `BusinessException` → warn 日志 + 返回业务消息；`AuthenticationException` → warn 日志 + 返回"手机号或密码错误"；`MethodArgumentNotValidException` → 拼接字段级校验错误；`Exception` → error 日志 + 兜底"服务器内部错误" |
 | **扩展** | 后续可新增 `@ExceptionHandler` 方法拦截特定异常 |
 
 #### 2.4 JWT 工具类
@@ -155,10 +154,10 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **注解** | `@Component` |
 | **功能** | 签发 / 解析 / 校验 JWT 令牌 |
 | **注入** | 构造注入 `app.jwt.secret`（签名密钥）+ `app.jwt.expiration`（有效期 ms） |
-| **方法** | `generateToken(userId, roles)` → 签发 token；`getUserIdFromToken(token)` → 提取 userId；`getRolesFromToken(token)` → 提取角色列表；`isTokenValid(token)` → 校验合法性与过期 |
+| **方法** | `generateToken(userId, roles)` → 签发 token；`getUserIdFromToken(token)` → 提取 userId；`getRolesFromToken(token)` → 提取角色列表；`isTokenValid(token)` → 校验合法性与过期；`getRemainingExpiration(token)` → 获取剩余有效时间（毫秒）；`extractBearerToken(request)` → 从 Authorization 头截取 Bearer token（static） |
 | **库** | jjwt 0.12.6（`Jwts.builder()` / `Jwts.parser().verifyWith()`） |
 | **载荷** | `sub`=userId, `roles`=角色列表, `iat`=签发时间, `exp`=过期时间 |
-| **依赖方** | `AuthService`（签发）、`JwtAuthenticationFilter`（校验） |
+| **依赖方** | `AuthServiceImpl`（签发/登出）、`JwtAuthenticationFilter`（校验/提取）、`AuthController`（登出时提取 token） |
 
 #### 2.5 Spring Security 用户适配
 
@@ -167,12 +166,13 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **文件** | `UserDetailsImpl.java` |
 | **包** | `common.security` |
 | **实现** | `UserDetails` |
-| **字段** | `userId: Long` + `password: String` + `roles: List<String>` |
+| **字段** | `userId: Long` + `password: String` + `roles: List<String>` + `enabled: boolean` |
 | **功能** | 将项目自有用户模型适配为 Spring Security 可识别的 `UserDetails` |
 | **`getAuthorities()`** | 角色列表 → `SimpleGrantedAuthority`（自动补 `ROLE_` 前缀） |
 | **`getUsername()`** | 返回 userId 字符串 |
 | **`getPassword()`** | 返回 BCrypt 加密密码，由 `DaoAuthenticationProvider` 自动比对 |
-| **构造来源** | 登录时由 `UserDetailsServiceImpl` 构建；鉴权时由 `JwtAuthenticationFilter` 从 token 构建 |
+| **`isEnabled()`** | 返回 user.status 对应的启用状态，status==1 → true，DaoAuthenticationProvider 前置检查拦截禁用用户 |
+| **构造来源** | 登录时由 `UserDetailsServiceImpl` 构建（含 enabled）；鉴权时由 `JwtAuthenticationFilter` 从 token 构建（enabled=true） |
 
 #### 2.6 用户加载服务
 
@@ -182,8 +182,8 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **包** | `common.security` |
 | **实现** | `UserDetailsService` |
 | **注入** | `UserMapper` + `UserRoleMapper`（`@RequiredArgsConstructor`） |
-| **功能** | `loadUserByUsername(phone)` → 查 user 表得用户信息 + 查 user_role 表得角色列表 → 组装 UserDetailsImpl |
-| **异常** | 手机号未注册 → `UsernameNotFoundException` |
+| **功能** | `loadUserByUsername(phone)` → 查 user 表得用户信息 + status → 查 user_role 表得角色列表 → 组装 UserDetailsImpl（含 enabled=status==1） |
+| **异常** | 手机号未注册 → `UsernameNotFoundException`；status=0 → `DisabledException`（由 DaoAuthenticationProvider 前置检查抛出） |
 
 #### 2.7 JWT 认证过滤器
 
@@ -192,21 +192,9 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **文件** | `JwtAuthenticationFilter.java` |
 | **包** | `common.security` |
 | **继承** | `OncePerRequestFilter`（保证每个请求只执行一次） |
-| **注入** | `JwtUtil`（`@RequiredArgsConstructor`） |
-| **功能** | 从 `Authorization: Bearer <token>` 头截取 JWT → 校验合法性 → 解析 userId + roles → 构建 `UserDetailsImpl` → 写入 `SecurityContextHolder` |
-| **关键设计** | 无状态（不查数据库，完全信任 JWT 载荷）；静默失败（token 不合法时不抛异常，由 SecurityConfig 返回 401） |
-
-#### 2.8 Spring Security 配置
-
-| 项目 | 说明 |
-|------|------|
-| **文件** | `SecurityConfig.java` |
-| **包** | `common.config` |
-| **注解** | `@Configuration` + `@EnableWebSecurity` |
-| **注入** | `JwtAuthenticationFilter` + `UserDetailsService` |
-| **Bean** | `SecurityFilterChain`（关闭 CSRF / 无状态 Session / 路由权限 / 注册 JWT 过滤器 / 401&403 JSON 响应）；`AuthenticationManager`；`PasswordEncoder`（BCrypt） |
-| **公开路径** | `/api/auth/login`、`/api/auth/register`、Knife4j 文档路径 |
-| **其余路径** | 一律要求认证 |
+| **注入** | `JwtUtil` + `StringRedisTemplate`（`@RequiredArgsConstructor`） |
+| **功能** | 从 `Authorization: Bearer <token>` 头截取 JWT → 校验合法性 → 检查 Redis 黑名单（已登出则拦截）→ 解析 userId + roles → 构建 `UserDetailsImpl` → 写入 `SecurityContextHolder` |
+| **关键设计** | 无状态（不查数据库，完全信任 JWT 载荷）；Redis 黑名单弥补 JWT 无法主动失效的缺陷；静默失败（token 不合法/已登出时不抛异常，由 SecurityConfig 返回 401） |
 
 ---
 
@@ -220,7 +208,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **包** | `controller` |
 | **注解** | `@RestController` + `@RequestMapping("/api/auth")` |
 | **注入** | `AuthService` |
-| **接口** | `POST /api/auth/login` — 手机号 + 密码登录；`POST /api/auth/register` — 新用户注册 |
+| **接口** | `POST /api/auth/login` — 登录；`POST /api/auth/register` — 注册；`POST /api/auth/logout` — 登出（token 加入 Redis 黑名单） |
 | **参数校验** | `@Valid` 自动触发 Bean Validation，校验失败由 `GlobalExceptionHandler` 统一返回 400 |
 
 ---
@@ -233,7 +221,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 |------|------|
 | **文件** | `AuthService.java` |
 | **包** | `service` |
-| **方法** | `login(LoginDTO)` → `LoginVO`；`register(RegisterDTO)` → `RegisterVO` |
+| **方法** | `login/register/logout` |
 
 #### 4.2 AuthServiceImpl 实现
 
@@ -241,9 +229,10 @@ src/main/java/com/duyell/communityfreshdelivery/
 |------|------|
 | **文件** | `AuthServiceImpl.java` |
 | **包** | `service.impl` |
-| **注入** | `AuthenticationManager` + `JwtUtil` + `UserMapper` + `UserRoleMapper` + `PasswordEncoder` |
-| **登录链路** | `AuthenticationManager.authenticate()` → `UserDetailsServiceImpl.loadUserByUsername()` → `DaoAuthenticationProvider` 比对 BCrypt → 签发 JWT → 返回 `LoginVO` |
+| **注入** | `AuthenticationManager` + `JwtUtil` + `UserMapper` + `UserRoleMapper` + `PasswordEncoder` + `StringRedisTemplate` |
+| **登录链路** | `AuthenticationManager.authenticate()` → `UserDetailsServiceImpl.loadUserByUsername()` → `DaoAuthenticationProvider` 比对 BCrypt（含 enabled 状态校验）→ 签发 JWT → 返回 `LoginVO` |
 | **注册链路** | `selectByPhone()` 校验唯一性 → BCrypt 加密 → INSERT user + INSERT user_role（`@Transactional`）→ 签发 JWT（注册即登录）→ 返回 `RegisterVO` |
+| **登出链路** | 校验 token 有效性 → 计算剩余过期时间 → 写入 Redis 黑名单（TTL 与 token 同步） |
 | **异常** | 手机号已注册 → `BusinessException(30001)`；认证失败 → `BadCredentialsException`（由 `GlobalExceptionHandler` 转 401） |
 
 ---
@@ -261,7 +250,19 @@ src/main/java/com/duyell/communityfreshdelivery/
 
 ### 6. Spring 配置 — `config/`
 
-#### 6.1 MyBatis-Plus 配置
+#### 6.1 Spring Security 配置
+
+| 项目 | 说明 |
+|------|------|
+| **文件** | `SecurityConfig.java` |
+| **包** | `config` |
+| **注解** | `@Configuration` + `@EnableWebSecurity` |
+| **注入** | `JwtAuthenticationFilter` |
+| **Bean** | `SecurityFilterChain`（关闭 CSRF / 无状态 Session / 路由权限 / 注册 JWT 过滤器 / 401&403 JSON 响应）；`AuthenticationManager`；`PasswordEncoder`（BCrypt） |
+| **公开路径** | `/api/auth/login`、`/api/auth/register`、`/api/auth/logout`、Knife4j 文档路径 |
+| **其余路径** | 一律要求认证 |
+
+#### 6.2 MyBatis-Plus 配置
 
 | 项目 | 说明 |
 |------|------|
@@ -271,7 +272,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **功能** | 注册 `MybatisPlusInterceptor`，仅启用分页插件（MySQL 方言）。SqlSessionFactory 和 Mapper 扫描由 starter 自动配置 |
 | **扩展** | 后续可追加乐观锁、防全表更新/删除等拦截器 |
 
-#### 6.2 接口文档配置
+#### 6.3 接口文档配置
 
 | 项目 | 说明 |
 |------|------|
@@ -336,7 +337,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **文件** | `UserMapper.java` |
 | **继承** | `BaseMapper<User>` |
 | **注解** | `@Mapper` |
-| **自定义方法** | `selectByPhone(String phone)` — 根据手机号查用户（`@Select` 注解 SQL） |
+| **自定义方法** | `selectByPhone(@Param("phone") String phone)` — 根据手机号查用户（`@Select` 注解 SQL，`@Param` 确保参数名在编译后保留） |
 
 #### 9.2 UserRoleMapper
 

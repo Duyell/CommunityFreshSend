@@ -28,7 +28,7 @@ import java.util.List;
  *         → UserDetailsServiceImpl.loadUserByUsername(phone)  ← 本类
  *             → UserMapper.selectOne(phone)   → 获取 userId + 加密密码
  *             → UserRoleMapper.selectList(userId) → 获取角色列表
- *             → new UserDetailsImpl(userId, password, roles)
+ *             → new UserDetailsImpl(userId, password, roles, enabled)
  * }</pre>
  *
  * @author duyell
@@ -68,6 +68,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         log.debug("加载用户: userId={}, roles={}", user.getId(), roles);
 
         // 3. 组装 UserDetails，密码由 DaoAuthenticationProvider 自动比对
-        return new UserDetailsImpl(user.getId(), user.getPassword(), roles);
+        //    status == 1 表示正常可用，其余视为禁用（登录时被 DaoAuthenticationProvider 拦截）
+        boolean enabled = user.getStatus() != null && user.getStatus() == 1;
+        return new UserDetailsImpl(user.getId(), user.getPassword(), roles, enabled);
     }
 }

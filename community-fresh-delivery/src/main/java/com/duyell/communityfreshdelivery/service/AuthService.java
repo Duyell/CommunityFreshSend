@@ -28,4 +28,13 @@ public interface AuthService {
      * @return 注册响应（token + 用户信息）
      */
     RegisterVO register(RegisterDTO dto);
+
+    /**
+     * 登出，将 token 加入 Redis 黑名单使其失效.
+     *
+     * <p>token 不存在或已过期时静默成功（幂等）.</p>
+     *
+     * @param token JWT 字符串（从 Authorization 头截取）
+     */
+    void logout(String token);
 }

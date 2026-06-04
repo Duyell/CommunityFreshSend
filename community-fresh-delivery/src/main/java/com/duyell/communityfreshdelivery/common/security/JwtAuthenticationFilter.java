@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,11 +36,11 @@ import java.util.List;
  *
  * <h3>认证流程</h3>
  * <pre>{@code
- * 请求 → extractToken() → isTokenValid()?
- *   ├── 否 → 跳过，继续 filter 链（SecurityConfig 会拦截未认证请求）
- *   └── 是 → getUserIdFromToken() + getRolesFromToken()
- *              → new UserDetailsImpl(userId, null, roles)
- *              → UsernamePasswordAuthenticationToken → SecurityContextHolder
+ * 请求 → extractToken() → isTokenValid()? → 检查 Redis 黑名单（已登出?）
+ *   ├── 任一步失败 → 跳过，继续 filter 链（SecurityConfig 返回 401）
+ *   └── 全部通过 → getUserIdFromToken() + getRolesFromToken()
+ *                    → new UserDetailsImpl(userId, null, roles, true)
+ *                    → UsernamePasswordAuthenticationToken → SecurityContextHolder
  * }</pre>
  *
  * @author duyell
@@ -51,10 +52,10 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final StringRedisTemplate redisTemplate;
 
-    /** Authorization 头的 token 前缀 */
-    private static final String BEARER_PREFIX = "Bearer ";
-    private static final int BEARER_PREFIX_LEN = BEARER_PREFIX.length();
+    /** Redis 中 JWT 黑名单的 key 前缀，与 {@code AuthServiceImpl} 保持一致 */
+    private static final String JWT_BLACKLIST_PREFIX = "jwt:blacklist:";
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -62,14 +63,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        String token = extractToken(request);
+        String token = JwtUtil.extractBearerToken(request);
 
         if (token != null && jwtUtil.isTokenValid(token)) {
+            // 检查 token 是否在黑名单中（已登出）
+            if (redisTemplate.hasKey(JWT_BLACKLIST_PREFIX + token)) {
+                log.debug("JWT 认证失败：token 已登出（命中黑名单）");
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             Long userId = jwtUtil.getUserIdFromToken(token);
             List<String> roles = jwtUtil.getRolesFromToken(token);
 
-            // 从 JWT 构建 UserDetails（无需密码，JWT 签名已验证）
-            UserDetailsImpl userDetails = new UserDetailsImpl(userId, null, roles);
+            // 从 JWT 构建 UserDetails（无需密码，JWT 签名已验证；enabled=true 因为登录时已检查状态）
+            UserDetailsImpl userDetails = new UserDetailsImpl(userId, null, roles, true);
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
@@ -88,17 +96,4 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * 从请求头中提取 Bearer token.
-     *
-     * @param request HTTP 请求
-     * @return token 字符串，不存在或格式不对时返回 {@code null}
-     */
-    private String extractToken(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith(BEARER_PREFIX)) {
-            return header.substring(BEARER_PREFIX_LEN);
-        }
-        return null;
-    }
 }

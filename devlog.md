@@ -54,6 +54,9 @@
 | | 商品 CRUD（商家端） | Product + ProductSku 主子表事务，创建/编辑/上下架/删除/详情/分页列表，@PreAuthorize 鉴权，SKU 先删后插 |
 | | 方法级鉴权 | SecurityConfig 加 @EnableMethodSecurity，GlobalExceptionHandler 加 AccessDeniedException 处理 |
 | | 端到端测试 | 分类树 + 商品 CRUD 全接口 + 鉴权（无token/普通用户/商家）全部通过 |
+| 2026-06-06 | 商品列表（用户端） | GET /api/product/list（分类浏览 + 搜索合一，keyword 可选）+ GET /api/product/search（同调 listForUser），仅返回上架商品，支持 price_asc/price_desc 排序，默认时间降序 |
+| | 代码规范修整 | @Transactional 补 rollbackFor；if 补大括号；消除行尾注释；消除重复代码（提取 toVOWithSkus/toVOPage）；消弭 queryForUser 空壳方法；合并 listForUser/searchForUser 为一个 Service 方法；sort 参数改为 optional 不设默认值 |
+| | 商品列表端到端测试 | ProductBrowseTest — 8 个用例覆盖：全部分类/按分类/价格升降序/关键词搜索/空结果/分页/字段完整性，全部通过 |
 
 ---
 
@@ -88,15 +91,15 @@
 
 ---
 
-## 第三步 商品模块（进行中）
+## 第三步 商品模块（已完成 ✅）
 
 - [x] **3.1** 分类接口 — 分类树查询（GET /api/category/tree）
 - [x] **3.2** 商品 CRUD — 商家端商品管理（创建/编辑/上下架/删除/详情/分页 + 鉴权）
-- [ ] **3.3** 商品列表 — 用户端分类浏览 + 搜索
+- [x] **3.3** 商品列表 — 用户端分类浏览 + 搜索（GET /api/product/list + /search）
 
 ---
 
 ## 下次待做
 
-- [ ] 3.3 商品列表（用户端）
+- [ ] **第四步** 收货地址管理 — Address CRUD（Entity/Mapper/Service/Controller）
 

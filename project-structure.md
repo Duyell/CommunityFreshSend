@@ -2,7 +2,7 @@
 # 项目结构文档
 
 > 社区生鲜配送系统 — 完整项目文件索引与功能说明  
-> 更新日期：2026-06-04
+> 更新日期：2026-06-06
 
 ---
 
@@ -244,7 +244,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **包** | `controller` |
 | **注解** | `@RestController` + `@RequestMapping("/api/product")` |
 | **注入** | `ProductService` |
-| **接口** | `POST /api/product` — 创建（@PreAuthorize ROLE_MERCHANT）；`PUT /api/product/{id}` — 编辑；`PUT /api/product/{id}/status` — 上下架；`DELETE /api/product/{id}` — 删除；`GET /api/product/{id}` — 详情（公开）；`GET /api/product/page` — 分页列表（@PreAuthorize） |
+| **接口** | `POST /api/product` — 创建（@PreAuthorize ROLE_MERCHANT）；`PUT /api/product/{id}` — 编辑；`PUT /api/product/{id}/status` — 上下架；`DELETE /api/product/{id}` — 删除；`GET /api/product/{id}` — 详情（公开）；`GET /api/product/page` — 商家端分页列表（@PreAuthorize）；`GET /api/product/list` — 用户端分类浏览（公开，仅上架商品，支持 price_asc/price_desc/time 排序）；`GET /api/product/search` — 用户端关键词搜索（公开，仅上架商品） |
 
 ---
 
@@ -294,7 +294,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 |------|------|
 | **文件** | `ProductService.java` |
 | **包** | `service` |
-| **方法** | `create/update/updateStatus/delete/getById/page` |
+| **方法** | `create/update/updateStatus/delete/getById/page/listForUser`（searchForUser 已合并入 listForUser，keyword 作为可选参数） |
 
 #### 4.6 ProductServiceImpl 实现
 
@@ -303,7 +303,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | **文件** | `ProductServiceImpl.java` |
 | **包** | `service.impl` |
 | **注入** | `ProductMapper` + `ProductSkuMapper` |
-| **关键设计** | 主子表事务（create/update）、SKU 先删后插、软删除（@TableLogic）、分页列表取最低售价 |
+| **关键设计** | 主子表事务（create/update）、SKU 先删后插（@Transactional(rollbackFor)）、软删除（@TableLogic）；用户端 listForUser 仅返回上架商品（status=1），时间排序走 MySQL 分页、价格排序全量加载内存排序后手动截取；内部提取 toVOWithSkus/toVOPage 消除重复 |
 | **异常** | 商品不存在 → `BusinessException(10001)` |
 
 ---
@@ -482,3 +482,4 @@ src/main/java/com/duyell/communityfreshdelivery/
 | `EnvironmentCheckTest.java` | 环境连通性全检 — MySQL / Redis / RabbitMQ / OSS |
 | `BcryptPasswordGeneratorTest.java` | 生成 "123456" 的 BCrypt hash，输出到控制台供 init.sql 使用 |
 | `AuthRegisterTest.java` | 注册流程集成测试（`@SpringBootTest`，直调 Service） |
+| `ProductBrowseTest.java` | 用户端商品列表集成测试 — 8 个用例：分类浏览/价格排序/关键词搜索/分页/字段完整性（`@SpringBootTest`） |

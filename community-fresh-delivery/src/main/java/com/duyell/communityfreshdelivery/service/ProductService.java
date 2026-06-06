@@ -62,4 +62,20 @@ public interface ProductService {
      * @return 分页结果
      */
     Page<ProductVO> page(int page, int size, Long categoryId, String keyword);
+
+    /**
+     * 用户端商品查询（仅上架商品）.
+     *
+     * <p>支持分类浏览 + 关键词搜索，按价格/时间排序.
+     * 价格排序时先全量查上架商品，内存计算最低售价后再分页；
+     * 商品总量有限（社区规模），性能无影响.</p>
+     *
+     * @param page       页码
+     * @param size       每页条数
+     * @param categoryId 分类 ID 筛选（可选，null=全部分类）
+     * @param keyword    关键词模糊搜索（可选，null=不限）
+     * @param sort       排序方式：{@code time}=最新（默认）、{@code price_asc}=价格升序、{@code price_desc}=价格降序
+     * @return 分页结果
+     */
+    Page<ProductVO> listForUser(int page, int size, Long categoryId, String keyword, String sort);
 }

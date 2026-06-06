@@ -109,4 +109,52 @@ public class ProductController {
         Page<ProductVO> result = productService.page(page, size, categoryId, keyword);
         return Result.ok(result);
     }
+
+    /**
+     * 用户端商品分类浏览（公开接口，仅返回上架商品）.
+     *
+     * <p>支持按"最新"（默认）或"价格升序/降序"排序.
+     * 列表不包含 SKU 明细，前端展示最低售价即可.</p>
+     *
+     * @param page       页码（默认 1）
+     * @param size       每页条数（默认 10）
+     * @param categoryId 分类 ID 筛选（可选，不传=全部分类）
+     * @param sort       排序：{@code time}=最新、{@code price_asc}=价格升序、{@code price_desc}=价格降序
+     * @return 分页列表（仅 status=1 上架商品）
+     */
+    @GetMapping("/list")
+    @Operation(summary = "用户端商品分类浏览")
+    public Result<Page<ProductVO>> listForUser(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String sort) {
+        Page<ProductVO> result = productService.listForUser(page, size, categoryId, null, sort);
+        return Result.ok(result);
+    }
+
+    /**
+     * 用户端商品搜索（公开接口，仅返回上架商品）.
+     *
+     * <p>模糊匹配商品名称，可在指定分类下搜索以缩小范围.
+     * 排序策略与 {@link #listForUser(int, int, Long, String)} 一致.</p>
+     *
+     * @param page       页码（默认 1）
+     * @param size       每页条数（默认 10）
+     * @param categoryId 分类 ID 筛选（可选，在指定分类下搜索）
+     * @param keyword    搜索关键词（模糊匹配商品名称）
+     * @param sort       排序：{@code time}=最新、{@code price_asc}=价格升序、{@code price_desc}=价格降序
+     * @return 分页列表（仅 status=1 上架商品）
+     */
+    @GetMapping("/search")
+    @Operation(summary = "用户端商品搜索")
+    public Result<Page<ProductVO>> searchForUser(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam String keyword,
+            @RequestParam(required = false) String sort) {
+        Page<ProductVO> result = productService.listForUser(page, size, categoryId, keyword, sort);
+        return Result.ok(result);
+    }
 }

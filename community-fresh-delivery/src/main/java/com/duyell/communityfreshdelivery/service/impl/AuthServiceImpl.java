@@ -81,7 +81,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public RegisterVO register(RegisterDTO dto) {
         // 1. 校验手机号唯一性
         if (userMapper.selectByPhone(dto.getPhone()) != null) {

@@ -72,6 +72,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 ├── controller/                              ← 接口层
 │   ├── AuthController.java                  ← 认证接口（登录/注册/登出）
 │   ├── AddressController.java               ← 收货地址接口（CRUD + 设默认）
+│   ├── CartController.java                  ← 购物车接口（加购/改数量/删/清/查）
 │   ├── CategoryController.java              ← 分类接口（分类树查询）
 │   └── ProductController.java               ← 商品接口（CRUD + 分页 + 用户端列表）
 │
@@ -82,6 +83,8 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── RegisterVO.java                      ← 注册响应
 │   ├── AddressSaveDTO.java                  ← 地址新增/编辑请求
 │   ├── AddressVO.java                       ← 地址响应
+│   ├── CartAddDTO.java                      ← 加购请求（skuId + quantity）
+│   ├── CartItemVO.java                      ← 购物车列表项（含商品名/规格/价格/库存状态）
 │   ├── CategoryVO.java                      ← 分类树节点
 │   ├── ProductSaveDTO.java                  ← 商品创建/编辑请求（含 SKU） 
 │   └── ProductVO.java                       ← 商品响应（含 SKU）
@@ -105,11 +108,13 @@ src/main/java/com/duyell/communityfreshdelivery/
 └── service/                                 ← 业务层
     ├── AuthService.java                     ← 认证服务接口
     ├── AddressService.java                  ← 地址服务接口
+    ├── CartService.java                     ← 购物车服务接口
     ├── CategoryService.java                 ← 分类服务接口
     ├── ProductService.java                  ← 商品服务接口
     └── impl/
         ├── AuthServiceImpl.java             ← 认证服务实现
         ├── AddressServiceImpl.java          ← 地址服务实现
+        ├── CartServiceImpl.java             ← 购物车服务实现（Redis Hash）
         ├── CategoryServiceImpl.java         ← 分类服务实现
         └── ProductServiceImpl.java          ← 商品服务实现
 ```
@@ -491,3 +496,4 @@ src/main/java/com/duyell/communityfreshdelivery/
 | `AuthRegisterTest.java` | 注册流程集成测试（`@SpringBootTest`，直调 Service） |
 | `ProductBrowseTest.java` | 用户端商品列表集成测试 — 8 个用例：分类浏览/价格排序/关键词搜索/分页/字段完整性（`@SpringBootTest`） |
 | `AddressServiceTest.java` | 地址 CRUD 集成测试 — 7 个用例：新增/编辑/删除/设默认/首个自动默认/列表排序/全部删除（`@SpringBootTest`） |
+| `CartServiceTest.java` | 购物车集成测试 — 8 个用例：加购累加/改数量/删单品/清空/多商品/空购物车/用户隔离（`@SpringBootTest`） |

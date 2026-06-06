@@ -59,6 +59,9 @@
 | | 商品列表端到端测试 | ProductBrowseTest — 8 个用例覆盖：全部分类/按分类/价格升降序/关键词搜索/空结果/分页/字段完整性，全部通过 |
 | | 收货地址 CRUD | Address Entity/Mapper/Service/Controller 全套，5 个接口（列表/新增/编辑/删除/设默认），用户级隔离，最多10个，首个自动默认 |
 | | 收货地址端到端测试 | AddressServiceTest — 7 个用例覆盖：新增列表/编辑/删除/设默认/首个自动默认/列表排序/全部删除，全部通过 |
+| | Redis 购物车 | Redis Hash 实现（key=cart:user:{userId}），CartService：add/updateQty/remove/clear/list，加购累加数量、改数量直接覆盖、列表批量查 SKU+Product 拼 VO，不扣库存仅校验 |
+| | 购物车端到端测试 | CartServiceTest — 8 个用例覆盖：加购累加/改数量/删单品/清空/多商品/空购物车/用户隔离，全部通过 |
+| | AddressServiceImpl.setDefault 优化 | selectList + for 循环 → 单条 LambdaUpdateWrapper UPDATE，消灭 N+1 |
 
 ---
 
@@ -108,7 +111,14 @@
 
 ---
 
+## 第五步 Redis 购物车（已完成 ✅）
+
+- [x] **5.1** CartService — add/updateQty/remove/clear/list，基于 Redis Hash，key=cart:user:{userId}，加购累加、改量覆盖、列表拼 SKU/Product 信息
+- [x] 加购校验 SKU 存在 + 库存 > 0，不扣库存（下单时才扣）
+
+---
+
 ## 下次待做
 
-- [ ] **第五步** Redis 购物车 — CartService（Redis Hash 存储，add/remove/updateQty/list/clear）
+- [ ] **第六步** 下单 + 模拟支付 — Order/OrderItem/Payment Entity + 下单事务（库存扣减+购物车清空）+ RabbitMQ 延迟消息超时取消
 

@@ -1,6 +1,7 @@
 package com.duyell.communityfreshdelivery.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.duyell.communityfreshdelivery.common.exception.BusinessException;
 import com.duyell.communityfreshdelivery.common.security.UserDetailsImpl;
 import com.duyell.communityfreshdelivery.dto.AddressSaveDTO;
@@ -116,15 +117,12 @@ public class AddressServiceImpl implements AddressService {
         getOwnAddress(id, userId);
 
         // 取消用户原有默认地址
-        List<Address> oldDefaults = addressMapper.selectList(
-                new LambdaQueryWrapper<Address>()
+        addressMapper.update(null,
+                new LambdaUpdateWrapper<Address>()
                         .eq(Address::getUserId, userId)
                         .eq(Address::getIsDefault, 1)
+                        .set(Address::getIsDefault, 0)
         );
-        for (Address old : oldDefaults) {
-            old.setIsDefault(0);
-            addressMapper.updateById(old);
-        }
 
         // 设置新默认
         Address address = new Address();

@@ -71,14 +71,17 @@ src/main/java/com/duyell/communityfreshdelivery/
 │
 ├── controller/                              ← 接口层
 │   ├── AuthController.java                  ← 认证接口（登录/注册/登出）
+│   ├── AddressController.java               ← 收货地址接口（CRUD + 设默认）
 │   ├── CategoryController.java              ← 分类接口（分类树查询）
-│   └── ProductController.java               ← 商品接口（CRUD + 分页）
+│   └── ProductController.java               ← 商品接口（CRUD + 分页 + 用户端列表）
 │
 ├── dto/                                     ← 数据传输对象
 │   ├── LoginDTO.java                        ← 登录请求
 │   ├── LoginVO.java                         ← 登录响应
 │   ├── RegisterDTO.java                     ← 注册请求
 │   ├── RegisterVO.java                      ← 注册响应
+│   ├── AddressSaveDTO.java                  ← 地址新增/编辑请求
+│   ├── AddressVO.java                       ← 地址响应
 │   ├── CategoryVO.java                      ← 分类树节点
 │   ├── ProductSaveDTO.java                  ← 商品创建/编辑请求（含 SKU） 
 │   └── ProductVO.java                       ← 商品响应（含 SKU）
@@ -86,6 +89,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 ├── entity/                                  ← 数据库实体
 │   ├── User.java                            ← user 表
 │   ├── UserRole.java                        ← user_role 表
+│   ├── Address.java                         ← address 表
 │   ├── Category.java                        ← category 表
 │   ├── Product.java                         ← product 表
 │   └── ProductSku.java                      ← product_sku 表
@@ -93,16 +97,19 @@ src/main/java/com/duyell/communityfreshdelivery/
 ├── mapper/                                  ← MyBatis-Plus Mapper
 │   ├── UserMapper.java                      ← 继承 BaseMapper<User> + selectByPhone()
 │   ├── UserRoleMapper.java                  ← 继承 BaseMapper<UserRole>
+│   ├── AddressMapper.java                   ← 继承 BaseMapper<Address>
 │   ├── CategoryMapper.java                  ← 继承 BaseMapper<Category>
 │   ├── ProductMapper.java                   ← 继承 BaseMapper<Product>
 │   └── ProductSkuMapper.java                ← 继承 BaseMapper<ProductSku> + deleteByProductId()
 │
 └── service/                                 ← 业务层
     ├── AuthService.java                     ← 认证服务接口
+    ├── AddressService.java                  ← 地址服务接口
     ├── CategoryService.java                 ← 分类服务接口
     ├── ProductService.java                  ← 商品服务接口
     └── impl/
         ├── AuthServiceImpl.java             ← 认证服务实现
+        ├── AddressServiceImpl.java          ← 地址服务实现
         ├── CategoryServiceImpl.java         ← 分类服务实现
         └── ProductServiceImpl.java          ← 商品服务实现
 ```
@@ -483,3 +490,4 @@ src/main/java/com/duyell/communityfreshdelivery/
 | `BcryptPasswordGeneratorTest.java` | 生成 "123456" 的 BCrypt hash，输出到控制台供 init.sql 使用 |
 | `AuthRegisterTest.java` | 注册流程集成测试（`@SpringBootTest`，直调 Service） |
 | `ProductBrowseTest.java` | 用户端商品列表集成测试 — 8 个用例：分类浏览/价格排序/关键词搜索/分页/字段完整性（`@SpringBootTest`） |
+| `AddressServiceTest.java` | 地址 CRUD 集成测试 — 7 个用例：新增/编辑/删除/设默认/首个自动默认/列表排序/全部删除（`@SpringBootTest`） |

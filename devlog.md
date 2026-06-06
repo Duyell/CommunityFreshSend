@@ -57,6 +57,8 @@
 | 2026-06-06 | 商品列表（用户端） | GET /api/product/list（分类浏览 + 搜索合一，keyword 可选）+ GET /api/product/search（同调 listForUser），仅返回上架商品，支持 price_asc/price_desc 排序，默认时间降序 |
 | | 代码规范修整 | @Transactional 补 rollbackFor；if 补大括号；消除行尾注释；消除重复代码（提取 toVOWithSkus/toVOPage）；消弭 queryForUser 空壳方法；合并 listForUser/searchForUser 为一个 Service 方法；sort 参数改为 optional 不设默认值 |
 | | 商品列表端到端测试 | ProductBrowseTest — 8 个用例覆盖：全部分类/按分类/价格升降序/关键词搜索/空结果/分页/字段完整性，全部通过 |
+| | 收货地址 CRUD | Address Entity/Mapper/Service/Controller 全套，5 个接口（列表/新增/编辑/删除/设默认），用户级隔离，最多10个，首个自动默认 |
+| | 收货地址端到端测试 | AddressServiceTest — 7 个用例覆盖：新增列表/编辑/删除/设默认/首个自动默认/列表排序/全部删除，全部通过 |
 
 ---
 
@@ -99,7 +101,14 @@
 
 ---
 
+## 第四步 收货地址模块（已完成 ✅）
+
+- [x] **4.1** Address Entity + Mapper + DTO + Service + Controller — 5 个接口（列表/新增/编辑/删除/设默认）
+- [x] 用户级隔离（SecurityContext 取当前用户）、最多 10 个地址、首个自动默认、默认地址排最前
+
+---
+
 ## 下次待做
 
-- [ ] **第四步** 收货地址管理 — Address CRUD（Entity/Mapper/Service/Controller）
+- [ ] **第五步** Redis 购物车 — CartService（Redis Hash 存储，add/remove/updateQty/list/clear）
 

@@ -2,7 +2,7 @@
 # 项目结构文档
 
 > 社区生鲜配送系统 — 完整项目文件索引与功能说明  
-> 更新日期：2026-06-07
+> 更新日期：2026-06-07（第七步完成）
 
 ---
 
@@ -64,7 +64,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   └── utils/
 │       ├── JwtUtil.java                     ← JWT 工具类
 │       ├── OrderNoUtil.java                 ← 订单编号生成器（22位）
-│       └── SecurityUtil.java                ← 安全上下文工具（currentUserId）
+│       └── SecurityUtil.java                ← 安全上下文工具（currentUserId，消除重复）
 │
 ├── config/                                  ← Spring 配置
 │   ├── SecurityConfig.java                  ← Spring Security 配置（JWT 过滤链 + 权限）
@@ -77,7 +77,8 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── AddressController.java               ← 收货地址接口（CRUD + 设默认）
 │   ├── CartController.java                  ← 购物车接口（加购/改数量/删/清/查）
 │   ├── CategoryController.java              ← 分类接口（分类树查询）
-│   ├── OrderController.java                 ← 订单接口（下单/支付/取消/查单）
+│   ├── DeliveryController.java              ← 配送员接口（大厅/抢单/取货/送达/我的配送）
+│   ├── OrderController.java                 ← 订单接口（下单/支付/取消/商家接单分拣）
 │   └── ProductController.java               ← 商品接口（CRUD + 分页 + 用户端列表）
 │
 ├── dto/                                     ← 数据传输对象
@@ -90,6 +91,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── CartAddDTO.java                      ← 加购请求（skuId + quantity）
 │   ├── CartItemVO.java                      ← 购物车列表项
 │   ├── CategoryVO.java                      ← 分类树节点
+│   ├── DeliveryVO.java                      ← 配送记录响应
 │   ├── OrderCreateDTO.java                  ← 下单请求
 │   ├── OrderItemVO.java                     ← 订单明细响应
 │   ├── OrderTimeoutMessage.java             ← 超时取消消息体
@@ -106,10 +108,13 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── Order.java                           ← order 表
 │   ├── OrderItem.java                       ← order_item 表
 │   ├── Payment.java                         ← payment 表
+│   ├── PickupPoint.java                     ← pickup_point 表
 │   ├── Product.java                         ← product 表
 │   └── ProductSku.java                      ← product_sku 表
 
 ├── enums/                                   ← 枚举
+│   ├── DeliveryStatus.java                  ← 配送状态（待取货/配送中/已送达）
+│   ├── DeliveryType.java                    ← 配送方式（配送到家/送达自提点）
 │   └── OrderStatus.java                    ← 订单状态（12状态 code↔text）
 │
 ├── mapper/                                  ← MyBatis-Plus Mapper
@@ -117,9 +122,11 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── UserRoleMapper.java                  ← 继承 BaseMapper<UserRole>
 │   ├── AddressMapper.java                   ← 继承 BaseMapper<Address>
 │   ├── CategoryMapper.java                  ← 继承 BaseMapper<Category>
+│   ├── DeliveryMapper.java                  ← 继承 BaseMapper<Delivery>
 │   ├── OrderMapper.java                     ← 继承 BaseMapper<Order>
 │   ├── OrderItemMapper.java                 ← 继承 BaseMapper<OrderItem>
 │   ├── PaymentMapper.java                   ← 继承 BaseMapper<Payment>
+│   ├── PickupPointMapper.java               ← 继承 BaseMapper<PickupPoint>
 │   ├── ProductMapper.java                   ← 继承 BaseMapper<Product>
 │   └── ProductSkuMapper.java                ← 继承 BaseMapper<ProductSku> + deleteByProductId/deductStock/addStock
 │
@@ -128,7 +135,8 @@ src/main/java/com/duyell/communityfreshdelivery/
     ├── AddressService.java                  ← 地址服务接口
     ├── CartService.java                     ← 购物车服务接口
     ├── CategoryService.java                 ← 分类服务接口
-    ├── OrderService.java                    ← 订单服务接口
+    ├── DeliveryService.java                 ← 配送服务接口
+    ├── OrderService.java                    ← 订单服务接口（含商家接单分拣）
     ├── PaymentService.java                  ← 支付服务接口（策略模式）
     ├── ProductService.java                  ← 商品服务接口
     └── impl/
@@ -136,8 +144,9 @@ src/main/java/com/duyell/communityfreshdelivery/
         ├── AddressServiceImpl.java          ← 地址服务实现
         ├── CartServiceImpl.java             ← 购物车服务实现（Redis Hash）
         ├── CategoryServiceImpl.java         ← 分类服务实现
+        ├── DeliveryServiceImpl.java         ← 配送服务实现（抢单/取货/送达）
         ├── MockPaymentServiceImpl.java      ← 模拟支付实现
-        ├── OrderServiceImpl.java            ← 订单服务实现（核心下单事务）
+        ├── OrderServiceImpl.java            ← 订单服务实现（下单/商家操作）
         ├── OrderTimeoutConsumer.java        ← 订单超时取消消费者（RabbitMQ）
         └── ProductServiceImpl.java          ← 商品服务实现
 ```
@@ -521,3 +530,4 @@ src/main/java/com/duyell/communityfreshdelivery/
 | `AddressServiceTest.java` | 地址 CRUD 集成测试 — 7 个用例：新增/编辑/删除/设默认/首个自动默认/列表排序/全部删除（`@SpringBootTest`） |
 | `CartServiceTest.java` | 购物车集成测试 — 8 个用例：加购累加/改数量/删单品/清空/多商品/空购物车/用户隔离（`@SpringBootTest`） |
 | `OrderServiceTest.java` | 订单集成测试 — 12 个用例：下单/自提/空购物车/库存不足/起送价/支付/重复支付/取消支付/取消订单/详情/用户隔离/分页（`@SpringBootTest`） |
+| `DeliveryServiceTest.java` | 配送集成测试 — 9 个用例：接单大厅/抢单/重复抢单/取货送达/角色隔离/我的配送/大厅过滤/无记录校验（`@SpringBootTest`） |

@@ -65,6 +65,19 @@ class OrderServiceTest {
         );
         SecurityContextHolder.setContext(context);
 
+        // 重置测试商品库存到固定值
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<com.duyell.communityfreshdelivery.entity.ProductSku> resetWrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+        resetWrapper.eq(com.duyell.communityfreshdelivery.entity.ProductSku::getId, SKU_ID)
+                .set(com.duyell.communityfreshdelivery.entity.ProductSku::getStock, 100);
+        productSkuMapper.update(null, resetWrapper);
+
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<com.duyell.communityfreshdelivery.entity.ProductSku> resetWrapper2 =
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+        resetWrapper2.eq(com.duyell.communityfreshdelivery.entity.ProductSku::getId, SKU_ID_2)
+                .set(com.duyell.communityfreshdelivery.entity.ProductSku::getStock, 50);
+        productSkuMapper.update(null, resetWrapper2);
+
         cartService.clear();
 
         // 创建测试收货地址

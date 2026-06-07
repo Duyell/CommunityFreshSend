@@ -13,6 +13,7 @@ import com.duyell.communityfreshdelivery.entity.Address;
 import com.duyell.communityfreshdelivery.entity.Order;
 import com.duyell.communityfreshdelivery.entity.OrderItem;
 import com.duyell.communityfreshdelivery.entity.Product;
+import com.duyell.communityfreshdelivery.enums.DeliveryType;
 import com.duyell.communityfreshdelivery.enums.OrderStatus;
 import com.duyell.communityfreshdelivery.mapper.AddressMapper;
 import com.duyell.communityfreshdelivery.mapper.OrderItemMapper;
@@ -97,7 +98,7 @@ public class OrderServiceImpl implements OrderService {
         Long userId = SecurityUtil.currentUserId();
 
         // 1. 校验配送参数
-        if (dto.getDeliveryType() == 1) {
+        if (dto.getDeliveryType().equals(DeliveryType.HOME_DELIVERY.getCode())) {
             if (dto.getAddressId() == null) {
                 throw new BusinessException(20001, "配送到家请选择收货地址");
             }
@@ -105,7 +106,7 @@ public class OrderServiceImpl implements OrderService {
             if (address == null || !address.getUserId().equals(userId)) {
                 throw new BusinessException(20001, "收货地址不存在");
             }
-        } else if (dto.getDeliveryType() == 2) {
+        } else if (dto.getDeliveryType().equals(DeliveryType.PICKUP.getCode())) {
             if (dto.getPickupPointId() == null) {
                 throw new BusinessException(20001, "自提请选择自提点");
             }
@@ -292,6 +293,36 @@ public class OrderServiceImpl implements OrderService {
         }
 
         log.info("订单已取消: userId={} orderNo={} reason={}", SecurityUtil.currentUserId(), order.getOrderNo(), reason);
+    }
+
+    // ==================== 商家操作 ====================
+
+    @Override
+    public void accept(Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(20006, "订单不存在");
+        }
+        if (order.getStatus() != OrderStatus.PENDING_ACCEPT.getCode()) {
+            throw new BusinessException(20007, "当前订单状态不可接单");
+        }
+        order.setStatus(OrderStatus.PENDING_SORTING.getCode());
+        orderMapper.updateById(order);
+        log.info("商家接单: orderNo={}", order.getOrderNo());
+    }
+
+    @Override
+    public void sortComplete(Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(20006, "订单不存在");
+        }
+        if (order.getStatus() != OrderStatus.PENDING_SORTING.getCode()) {
+            throw new BusinessException(20007, "当前订单状态不可分拣");
+        }
+        order.setStatus(OrderStatus.PENDING_DELIVERY.getCode());
+        orderMapper.updateById(order);
+        log.info("商家分拣完成: orderNo={}", order.getOrderNo());
     }
 
     // ==================== 内部方法 ====================

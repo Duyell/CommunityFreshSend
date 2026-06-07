@@ -65,6 +65,9 @@
 | 2026-06-07 | 下单 + 模拟支付 | 第六步完整模块：Order/OrderItem/Payment Entity + Mapper + DTO/VO + OrderService（place/cancel/page/getById）+ MockPaymentService（策略模式）+ RabbitMQ 死信队列延迟消息（DLX+TTL 代替插件）+ OrderController 6 个接口 |
 | | 消弭重复代码 | SecurityUtil 提取 currentUserId()（3 个 ServiceImpl 共用）；OrderServiceImpl.place() 复用 CartService.list()/clear()；MockPaymentServiceImpl.cancelPay() 复用 OrderService.cancel()；变量名 qty→quantity |
 | | 订单端到端测试 | OrderServiceTest — 12 个用例覆盖：下单/自提/空车/库存不足/起送价/支付/重复支付/取消支付/取消订单/详情/用户隔离/分页，全部通过 |
+| | 商家接单分拣 + 配送员配送 | 第七步完整模块：Delivery/PickupPoint Entity + Mapper + DeliveryType/DeliveryStatus 枚举 + OrderService 追加 accept/sortComplete + DeliveryService（hall/grab/confirmPickup/confirmDelivery/myDeliveries）+ DeliveryController 5 个接口 + OrderController 追加 2 个商家接口 |
+| | 消弭重复代码 | DeliveryServiceImpl.hall/myDeliveries 批量加载地址和自提点消除 N+1；grab() 用条件 UPDATE 原子抢单消除重复检查；DeliveryType 枚举消除 deliveryType==1/2 魔法值 |
+| | 配送端到端测试 | DeliveryServiceTest — 9 个用例覆盖：接单大厅/抢单/重复抢单/取货送达/角色隔离/我的配送/无记录校验，全部通过 |
 
 ---
 
@@ -140,7 +143,25 @@
 
 ---
 
+---
+
+## 第七步 商家接单分拣 + 配送员配送（已完成 ✅）
+
+- [x] **7.1** Entity — Delivery / PickupPoint + 枚举 DeliveryStatus / DeliveryType
+- [x] **7.2** Mapper — DeliveryMapper / PickupPointMapper
+- [x] **7.3** DTO — DeliveryVO
+- [x] **7.4** OrderService 追加 accept / sortComplete（status 1→2→3）
+- [x] **7.5** DeliveryService + DeliveryServiceImpl — hall / grab / confirmPickup / confirmDelivery / myDeliveries
+  - grab() 用条件 UPDATE（WHERE status=PENDING_DELIVERY）原子抢单
+  - hall/myDeliveries 批量加载地址和自提点消除 N+1
+- [x] **7.6** OrderController 追加 2 个商家接口（accept / sortComplete，@PreAuthorize MERCHANT）
+- [x] **7.7** DeliveryController — 5 个接口（hall / grab / pickup / deliver / my，@PreAuthorize DELIVERY）
+- [x] **7.8** 端到端测试 — 9 个用例覆盖接单大厅/抢单/重复抢单/取货送达/角色隔离/我的配送，全部通过
+- [x] **消弭重复代码** — 批量加载消除 N+1；条件 UPDATE 原子抢单；DeliveryType 枚举消除魔法值
+
+---
+
 ## 下次待做
 
-- [ ] **第七步** 配送模块 — 配送员接单大厅 / 抢单 / 取货确认 / 送达确认 / 批量配送自提点
+- [ ] **第八步** 自提模块 — 团长申请与审核 / 团长模式切换 / 提货码核销 / 自提超时退回
 

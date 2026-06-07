@@ -48,4 +48,20 @@ public interface OrderService {
      * @param reason  取消原因
      */
     void cancel(Long orderId, String reason);
+
+    /**
+     * 商家接单（status 1→2）.
+     * Controller 层 {@code @PreAuthorize("hasRole('MERCHANT')")} 控制权限.
+     *
+     * @param orderId 订单ID
+     */
+    void accept(Long orderId);
+
+    /**
+     * 商家分拣完成（status 2→3），订单进入待配送.
+     * Controller 层 {@code @PreAuthorize("hasRole('MERCHANT')")} 控制权限.
+     *
+     * @param orderId 订单ID
+     */
+    void sortComplete(Long orderId);
 }

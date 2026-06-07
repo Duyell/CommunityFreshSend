@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/order")
 @RequiredArgsConstructor
-@Tag(name = "订单", description = "下单/支付/取消/查单")
+@Tag(name = "订单", description = "下单/支付/取消/查单/商家接单分拣")
 public class OrderController {
 
     private final OrderService orderService;
@@ -80,5 +80,21 @@ public class OrderController {
     public Result<Void> cancelPay(@PathVariable Long id) {
         paymentService.cancelPay(id);
         return Result.ok("已取消支付", null);
+    }
+
+    @PutMapping("/{id}/accept")
+    @Operation(summary = "商家接单")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public Result<Void> accept(@PathVariable Long id) {
+        orderService.accept(id);
+        return Result.ok("已接单", null);
+    }
+
+    @PutMapping("/{id}/sort-complete")
+    @Operation(summary = "商家分拣完成")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public Result<Void> sortComplete(@PathVariable Long id) {
+        orderService.sortComplete(id);
+        return Result.ok("分拣完成", null);
     }
 }

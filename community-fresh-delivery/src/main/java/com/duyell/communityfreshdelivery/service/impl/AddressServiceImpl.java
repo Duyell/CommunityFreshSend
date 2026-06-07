@@ -3,7 +3,7 @@ package com.duyell.communityfreshdelivery.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.duyell.communityfreshdelivery.common.exception.BusinessException;
-import com.duyell.communityfreshdelivery.common.security.UserDetailsImpl;
+import com.duyell.communityfreshdelivery.common.utils.SecurityUtil;
 import com.duyell.communityfreshdelivery.dto.AddressSaveDTO;
 import com.duyell.communityfreshdelivery.dto.AddressVO;
 import com.duyell.communityfreshdelivery.entity.Address;
@@ -11,7 +11,6 @@ import com.duyell.communityfreshdelivery.mapper.AddressMapper;
 import com.duyell.communityfreshdelivery.service.AddressService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,16 +40,11 @@ public class AddressServiceImpl implements AddressService {
 
     private static final int MAX_ADDRESS_COUNT = 10;
 
-    /** 从 SecurityContext 获取当前登录用户 ID */
-    private Long currentUserId() {
-        UserDetailsImpl principal = (UserDetailsImpl) SecurityContextHolder.getContext()
-                .getAuthentication().getPrincipal();
-        return principal.getUserId();
-    }
+    // SecurityUtil.currentUserId() → 改用 SecurityUtil.SecurityUtil.currentUserId()，消除重复代码
 
     @Override
     public List<AddressVO> list() {
-        Long userId = currentUserId();
+        Long userId = SecurityUtil.currentUserId();
         List<Address> addresses = addressMapper.selectList(
                 new LambdaQueryWrapper<Address>()
                         .eq(Address::getUserId, userId)
@@ -65,7 +59,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AddressVO create(AddressSaveDTO dto) {
-        Long userId = currentUserId();
+        Long userId = SecurityUtil.currentUserId();
 
         long count = addressMapper.selectCount(
                 new LambdaQueryWrapper<Address>()
@@ -93,7 +87,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AddressVO update(Long id, AddressSaveDTO dto) {
-        Long userId = currentUserId();
+        Long userId = SecurityUtil.currentUserId();
         Address address = getOwnAddress(id, userId);
 
         fillFields(address, dto);
@@ -104,7 +98,7 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     public void delete(Long id) {
-        Long userId = currentUserId();
+        Long userId = SecurityUtil.currentUserId();
         getOwnAddress(id, userId);
         addressMapper.deleteById(id);
         log.info("地址删除成功: id={}, userId={}", id, userId);
@@ -113,7 +107,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void setDefault(Long id) {
-        Long userId = currentUserId();
+        Long userId = SecurityUtil.currentUserId();
         getOwnAddress(id, userId);
 
         // 取消用户原有默认地址

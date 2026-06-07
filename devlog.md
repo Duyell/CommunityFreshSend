@@ -62,6 +62,9 @@
 | | Redis 购物车 | Redis Hash 实现（key=cart:user:{userId}），CartService：add/updateQty/remove/clear/list，加购累加数量、改数量直接覆盖、列表批量查 SKU+Product 拼 VO，不扣库存仅校验 |
 | | 购物车端到端测试 | CartServiceTest — 8 个用例覆盖：加购累加/改数量/删单品/清空/多商品/空购物车/用户隔离，全部通过 |
 | | AddressServiceImpl.setDefault 优化 | selectList + for 循环 → 单条 LambdaUpdateWrapper UPDATE，消灭 N+1 |
+| 2026-06-07 | 下单 + 模拟支付 | 第六步完整模块：Order/OrderItem/Payment Entity + Mapper + DTO/VO + OrderService（place/cancel/page/getById）+ MockPaymentService（策略模式）+ RabbitMQ 死信队列延迟消息（DLX+TTL 代替插件）+ OrderController 6 个接口 |
+| | 消弭重复代码 | SecurityUtil 提取 currentUserId()（3 个 ServiceImpl 共用）；OrderServiceImpl.place() 复用 CartService.list()/clear()；MockPaymentServiceImpl.cancelPay() 复用 OrderService.cancel()；变量名 qty→quantity |
+| | 订单端到端测试 | OrderServiceTest — 12 个用例覆盖：下单/自提/空车/库存不足/起送价/支付/重复支付/取消支付/取消订单/详情/用户隔离/分页，全部通过 |
 
 ---
 
@@ -118,7 +121,26 @@
 
 ---
 
+## 第六步 下单 + 模拟支付（已完成 ✅）
+
+- [x] **6.1** Entity — Order / OrderItem / Payment
+- [x] **6.2** Mapper — OrderMapper / OrderItemMapper / PaymentMapper
+- [x] **6.3** DTO/VO — OrderCreateDTO / OrderVO / OrderItemVO / PayRequestDTO / OrderTimeoutMessage
+- [x] **6.4** 订单编号生成器 — OrderNoUtil（14位时间戳 + 8位随机码）
+- [x] **6.5** 订单状态枚举 — OrderStatus（12 状态 code↔text）
+- [x] **6.6** OrderService + OrderServiceImpl — place / getById / page / cancel
+  - 下单事务：校验配送参数 → 复用 CartService.list() 读购物车 → 库存预检 + 计算金额 → 扣减 MySQL 库存（WHERE stock >= quantity 防超卖）→ 生成订单号 → 写 order + order_item → 清空购物车 → 发死信延迟消息
+  - 取消回补库存 + 用户隔离
+- [x] **6.7** PaymentService + MockPaymentServiceImpl — 策略模式（@Service("mockPaymentService")），pay()/cancelPay() 复用 OrderService.cancel()
+- [x] **6.8** RabbitMQ 死信队列延迟消息 — DLX + TTL（无需插件，兼容 4.3.x），RabbitMQConfig + OrderTimeoutConsumer
+- [x] **6.9** OrderController — 6 个接口：POST /api/order、GET /{id}、GET /page、PUT /{id}/cancel、POST /{id}/pay、POST /{id}/cancel-pay
+- [x] **6.10** ProductSkuMapper 补充 — deductStock / addStock（@Update 注解）
+- [x] **6.11** 端到端测试 — 12 个用例全部通过
+- [x] **消弭重复代码** — SecurityUtil.currentUserId() 统一 3 个 ServiceImpl；下单复用 CartService；取消支付复用 OrderService.cancel()
+
+---
+
 ## 下次待做
 
-- [ ] **第六步** 下单 + 模拟支付 — Order/OrderItem/Payment Entity + 下单事务（库存扣减+购物车清空）+ RabbitMQ 延迟消息超时取消
+- [ ] **第七步** 配送模块 — 配送员接单大厅 / 抢单 / 取货确认 / 送达确认 / 批量配送自提点
 

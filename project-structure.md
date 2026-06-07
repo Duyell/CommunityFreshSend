@@ -2,7 +2,7 @@
 # 项目结构文档
 
 > 社区生鲜配送系统 — 完整项目文件索引与功能说明  
-> 更新日期：2026-06-06
+> 更新日期：2026-06-07
 
 ---
 
@@ -62,18 +62,22 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   │   ├── UserDetailsImpl.java             ← Spring Security 用户适配
 │   │   └── UserDetailsServiceImpl.java      ← 用户加载服务
 │   └── utils/
-│       └── JwtUtil.java                     ← JWT 工具类
+│       ├── JwtUtil.java                     ← JWT 工具类
+│       ├── OrderNoUtil.java                 ← 订单编号生成器（22位）
+│       └── SecurityUtil.java                ← 安全上下文工具（currentUserId）
 │
 ├── config/                                  ← Spring 配置
 │   ├── SecurityConfig.java                  ← Spring Security 配置（JWT 过滤链 + 权限）
 │   ├── MybatisPlusConfig.java               ← MyBatis-Plus 分页插件
-│   └── Knife4jConfig.java                   ← Swagger 接口文档
+│   ├── Knife4jConfig.java                   ← Swagger 接口文档
+│   └── RabbitMQConfig.java                  ← RabbitMQ 死信队列 + JSON 序列化
 │
 ├── controller/                              ← 接口层
 │   ├── AuthController.java                  ← 认证接口（登录/注册/登出）
 │   ├── AddressController.java               ← 收货地址接口（CRUD + 设默认）
 │   ├── CartController.java                  ← 购物车接口（加购/改数量/删/清/查）
 │   ├── CategoryController.java              ← 分类接口（分类树查询）
+│   ├── OrderController.java                 ← 订单接口（下单/支付/取消/查单）
 │   └── ProductController.java               ← 商品接口（CRUD + 分页 + 用户端列表）
 │
 ├── dto/                                     ← 数据传输对象
@@ -84,9 +88,14 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── AddressSaveDTO.java                  ← 地址新增/编辑请求
 │   ├── AddressVO.java                       ← 地址响应
 │   ├── CartAddDTO.java                      ← 加购请求（skuId + quantity）
-│   ├── CartItemVO.java                      ← 购物车列表项（含商品名/规格/价格/库存状态）
+│   ├── CartItemVO.java                      ← 购物车列表项
 │   ├── CategoryVO.java                      ← 分类树节点
-│   ├── ProductSaveDTO.java                  ← 商品创建/编辑请求（含 SKU） 
+│   ├── OrderCreateDTO.java                  ← 下单请求
+│   ├── OrderItemVO.java                     ← 订单明细响应
+│   ├── OrderTimeoutMessage.java             ← 超时取消消息体
+│   ├── OrderVO.java                         ← 订单响应
+│   ├── PayRequestDTO.java                   ← 支付请求
+│   ├── ProductSaveDTO.java                  ← 商品创建/编辑请求（含 SKU）
 │   └── ProductVO.java                       ← 商品响应（含 SKU）
 │
 ├── entity/                                  ← 数据库实体
@@ -94,28 +103,42 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── UserRole.java                        ← user_role 表
 │   ├── Address.java                         ← address 表
 │   ├── Category.java                        ← category 表
+│   ├── Order.java                           ← order 表
+│   ├── OrderItem.java                       ← order_item 表
+│   ├── Payment.java                         ← payment 表
 │   ├── Product.java                         ← product 表
 │   └── ProductSku.java                      ← product_sku 表
+
+├── enums/                                   ← 枚举
+│   └── OrderStatus.java                    ← 订单状态（12状态 code↔text）
 │
 ├── mapper/                                  ← MyBatis-Plus Mapper
 │   ├── UserMapper.java                      ← 继承 BaseMapper<User> + selectByPhone()
 │   ├── UserRoleMapper.java                  ← 继承 BaseMapper<UserRole>
 │   ├── AddressMapper.java                   ← 继承 BaseMapper<Address>
 │   ├── CategoryMapper.java                  ← 继承 BaseMapper<Category>
+│   ├── OrderMapper.java                     ← 继承 BaseMapper<Order>
+│   ├── OrderItemMapper.java                 ← 继承 BaseMapper<OrderItem>
+│   ├── PaymentMapper.java                   ← 继承 BaseMapper<Payment>
 │   ├── ProductMapper.java                   ← 继承 BaseMapper<Product>
-│   └── ProductSkuMapper.java                ← 继承 BaseMapper<ProductSku> + deleteByProductId()
+│   └── ProductSkuMapper.java                ← 继承 BaseMapper<ProductSku> + deleteByProductId/deductStock/addStock
 │
 └── service/                                 ← 业务层
     ├── AuthService.java                     ← 认证服务接口
     ├── AddressService.java                  ← 地址服务接口
     ├── CartService.java                     ← 购物车服务接口
     ├── CategoryService.java                 ← 分类服务接口
+    ├── OrderService.java                    ← 订单服务接口
+    ├── PaymentService.java                  ← 支付服务接口（策略模式）
     ├── ProductService.java                  ← 商品服务接口
     └── impl/
         ├── AuthServiceImpl.java             ← 认证服务实现
         ├── AddressServiceImpl.java          ← 地址服务实现
         ├── CartServiceImpl.java             ← 购物车服务实现（Redis Hash）
         ├── CategoryServiceImpl.java         ← 分类服务实现
+        ├── MockPaymentServiceImpl.java      ← 模拟支付实现
+        ├── OrderServiceImpl.java            ← 订单服务实现（核心下单事务）
+        ├── OrderTimeoutConsumer.java        ← 订单超时取消消费者（RabbitMQ）
         └── ProductServiceImpl.java          ← 商品服务实现
 ```
 
@@ -497,3 +520,4 @@ src/main/java/com/duyell/communityfreshdelivery/
 | `ProductBrowseTest.java` | 用户端商品列表集成测试 — 8 个用例：分类浏览/价格排序/关键词搜索/分页/字段完整性（`@SpringBootTest`） |
 | `AddressServiceTest.java` | 地址 CRUD 集成测试 — 7 个用例：新增/编辑/删除/设默认/首个自动默认/列表排序/全部删除（`@SpringBootTest`） |
 | `CartServiceTest.java` | 购物车集成测试 — 8 个用例：加购累加/改数量/删单品/清空/多商品/空购物车/用户隔离（`@SpringBootTest`） |
+| `OrderServiceTest.java` | 订单集成测试 — 12 个用例：下单/自提/空购物车/库存不足/起送价/支付/重复支付/取消支付/取消订单/详情/用户隔离/分页（`@SpringBootTest`） |

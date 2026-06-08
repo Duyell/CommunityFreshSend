@@ -68,6 +68,15 @@
 | | 商家接单分拣 + 配送员配送 | 第七步完整模块：Delivery/PickupPoint Entity + Mapper + DeliveryType/DeliveryStatus 枚举 + OrderService 追加 accept/sortComplete + DeliveryService（hall/grab/confirmPickup/confirmDelivery/myDeliveries）+ DeliveryController 5 个接口 + OrderController 追加 2 个商家接口 |
 | | 消弭重复代码 | DeliveryServiceImpl.hall/myDeliveries 批量加载地址和自提点消除 N+1；grab() 用条件 UPDATE 原子抢单消除重复检查；DeliveryType 枚举消除 deliveryType==1/2 魔法值 |
 | | 配送端到端测试 | DeliveryServiceTest — 9 个用例覆盖：接单大厅/抢单/重复抢单/取货送达/角色隔离/我的配送/无记录校验，全部通过 |
+| 2026-06-08 | 团长申请与审核 | GroupLeaderApplication Entity/Mapper + GroupLeaderApplyDTO/ApplicationVO/ReviewDTO + GroupLeaderApplicationService（apply/myApplication/pageApplications/review）+ GroupLeaderApplicationController 6 个接口 |
+| | 提货码核销 | GroupLeaderApplicationService.verifyPickup（查自提点→校验归属→核销态变更 5→6）+ PickupCodeDTO |
+| | 自提点公开接口 | PickupPointController（list/detail，PERMIT_ALL），下单前即可浏览 |
+| | 自提超时自动退回 | PickupTimeoutScheduler（@Scheduled 每天 3 点扫描 status=5 超时未取→自动取消）+ SysConfig Entity/Mapper + @EnableScheduling |
+| | SecurityConfig 更新 | PERMIT_ALL_PATHS 新增 /api/pickup-point/**（公开浏览自提点） |
+| | UserRoleMapper 强化 | physicalDelete() 物理删除（绕过 @TableLogic），修复软删除同值 re-grant 唯一约束冲突 |
+| | 端到端测试 | GroupLeaderApplicationServiceTest（9 用例）+ PickupVerifyServiceTest（6 用例），15/15 全部通过 |
+| 2026-06-08 | 评价模块 | Review Entity/Mapper + ReviewCreateDTO/ReviewVO + ReviewService（create/getByOrderId/getByProductId/myReviews）+ ReviewController 4 个接口 + SecurityConfig 公开 /api/review/product/** |
+| | 端到端测试 | ReviewServiceTest — 9 个用例覆盖：创建评价/无文字/重复评价/非本人订单/状态校验/订单查询/商品分页/我的评价/空结果，全部通过 |
 
 ---
 
@@ -143,8 +152,6 @@
 
 ---
 
----
-
 ## 第七步 商家接单分拣 + 配送员配送（已完成 ✅）
 
 - [x] **7.1** Entity — Delivery / PickupPoint + 枚举 DeliveryStatus / DeliveryType
@@ -161,7 +168,37 @@
 
 ---
 
+## 第八步 自提模块（已完成 ✅）
+
+- [x] **8.1** Entity — `GroupLeaderApplication` + `SysConfig`
+- [x] **8.2** Mapper — `GroupLeaderApplicationMapper` / `SysConfigMapper`
+- [x] **8.3** DTO — `GroupLeaderApplyDTO` / `GroupLeaderApplicationVO` / `GroupLeaderReviewDTO` / `PickupCodeDTO`
+- [x] **8.4** `GroupLeaderApplicationService` + `GroupLeaderApplicationServiceImpl` — apply / myApplication / pageApplications / review / verifyPickup / myPickupPoint
+  - `review()` @Transactional：通过时创建 pickup_point + 追加 ROLE_GROUP_LEADER + 更新申请状态
+  - `verifyPickup()`：查团长自提点 → 提货码查订单 → 校验归属 + status=5 → 更新 status=6（用户已自提）+ pickupTime
+  - `UserRoleMapper.physicalDelete()` 物理删除绕过 @TableLogic，修复软删除后同值 re-grant 唯一约束冲突
+- [x] **8.5** Controller — `GroupLeaderApplicationController`（用户端 apply/my + 管理端 page/review + 团长端 myPickupPoint/verify，方法级 @PreAuthorize）；`PickupPointController`（公开 list/detail）
+- [x] **8.6** SecurityConfig — `PERMIT_ALL_PATHS` 新增 `/api/pickup-point/**`
+- [x] **8.7** `PickupTimeoutScheduler` — `@Scheduled(cron = "0 0 3 * * ?")` 每天凌晨 3 点扫描 status=5 超时未取订单 → 自动取消退回，超时天数从 `sys_config.pickup_timeout_days` 读取
+- [x] **8.8** `CommunityFreshDeliveryApplication` — 加 `@EnableScheduling`
+- [x] **8.9** 端到端测试 — `GroupLeaderApplicationServiceTest`（9 用例）+ `PickupVerifyServiceTest`（6 用例），15/15 全部通过
+
+---
+
+## 第九步 评价模块（已完成 ✅）
+
+- [x] **9.1** Entity — `Review`
+- [x] **9.2** Mapper — `ReviewMapper`
+- [x] **9.3** DTO — `ReviewCreateDTO`（score 1-5 @Min/@Max 校验）/ `ReviewVO`（含 userNickname + productName）
+- [x] **9.4** `ReviewService` + `ReviewServiceImpl` — create / getByOrderId / getByProductId / myReviews
+  - `create()` @Transactional：先查重复 → 校验订单状态（5/6/7）→ 校验商品在订单中 → 创建评价 → 所有商品均已评价则完成订单(8)否则待评价(7)
+- [x] **9.5** `ReviewController` — 4 个接口：POST /api/review（USER）、GET /api/review/order/{id}、GET /api/review/product/{id}（公开）、GET /api/review/my（USER）
+- [x] **9.6** SecurityConfig — `PERMIT_ALL_PATHS` 新增 `/api/review/product/**`（公开浏览）
+- [x] **9.7** 端到端测试 — `ReviewServiceTest`（9 用例），全部通过
+
+---
+
 ## 下次待做
 
-- [ ] **第八步** 自提模块 — 团长申请与审核 / 团长模式切换 / 提货码核销 / 自提超时退回
+- [ ] **第十步** 优惠券 / 站内消息 / 批次库存模块
 

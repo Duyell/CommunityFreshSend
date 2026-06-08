@@ -2,7 +2,7 @@
 # 项目结构文档
 
 > 社区生鲜配送系统 — 完整项目文件索引与功能说明  
-> 更新日期：2026-06-07（第七步完成）
+> 更新日期：2026-06-08（第八步完成）
 
 ---
 
@@ -79,7 +79,10 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── CategoryController.java              ← 分类接口（分类树查询）
 │   ├── DeliveryController.java              ← 配送员接口（大厅/抢单/取货/送达/我的配送）
 │   ├── OrderController.java                 ← 订单接口（下单/支付/取消/商家接单分拣）
-│   └── ProductController.java               ← 商品接口（CRUD + 分页 + 用户端列表）
+│   ├── GroupLeaderApplicationController.java ← 团长接口（申请/审核/核销）
+│   ├── PickupPointController.java           ← 自提点接口（列表/详情）
+│   ├── ReviewController.java                  ← 评价接口（创建/查询）
+│   ├── ProductController.java               ← 商品接口（CRUD + 分页 + 用户端列表）
 │
 ├── dto/                                     ← 数据传输对象
 │   ├── LoginDTO.java                        ← 登录请求
@@ -98,19 +101,28 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── OrderVO.java                         ← 订单响应
 │   ├── PayRequestDTO.java                   ← 支付请求
 │   ├── ProductSaveDTO.java                  ← 商品创建/编辑请求（含 SKU）
-│   └── ProductVO.java                       ← 商品响应（含 SKU）
+│   ├── ProductVO.java                       ← 商品响应（含 SKU）
+│   ├── GroupLeaderApplyDTO.java              ← 团长申请请求
+│   ├── GroupLeaderApplicationVO.java        ← 团长申请响应
+│   ├── GroupLeaderReviewDTO.java            ← 团长审核请求
+│   ├── ReviewCreateDTO.java                  ← 评价创建请求
+│   ├── ReviewVO.java                         ← 评价响应
+│   └── PickupCodeDTO.java                   ← 提货码核销请求
 │
 ├── entity/                                  ← 数据库实体
 │   ├── User.java                            ← user 表
 │   ├── UserRole.java                        ← user_role 表
 │   ├── Address.java                         ← address 表
 │   ├── Category.java                        ← category 表
+│   ├── GroupLeaderApplication.java          ← group_leader_application 表（团长申请）
 │   ├── Order.java                           ← order 表
 │   ├── OrderItem.java                       ← order_item 表
 │   ├── Payment.java                         ← payment 表
 │   ├── PickupPoint.java                     ← pickup_point 表
+│   ├── Review.java                           ← review 表（商品评价）
 │   ├── Product.java                         ← product 表
-│   └── ProductSku.java                      ← product_sku 表
+│   ├── ProductSku.java                      ← product_sku 表
+│   └── SysConfig.java                       ← sys_config 表（系统配置）
 
 ├── enums/                                   ← 枚举
 │   ├── DeliveryStatus.java                  ← 配送状态（待取货/配送中/已送达）
@@ -128,7 +140,10 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── PaymentMapper.java                   ← 继承 BaseMapper<Payment>
 │   ├── PickupPointMapper.java               ← 继承 BaseMapper<PickupPoint>
 │   ├── ProductMapper.java                   ← 继承 BaseMapper<Product>
-│   └── ProductSkuMapper.java                ← 继承 BaseMapper<ProductSku> + deleteByProductId/deductStock/addStock
+│   ├── ReviewMapper.java                     ← 继承 BaseMapper<Review>
+│   ├── ProductSkuMapper.java                ← 继承 BaseMapper<ProductSku> + deleteByProductId/deductStock/addStock
+│   ├── GroupLeaderApplicationMapper.java   ← 继承 BaseMapper<GroupLeaderApplication>
+│   └── SysConfigMapper.java                 ← 继承 BaseMapper<SysConfig>
 │
 └── service/                                 ← 业务层
     ├── AuthService.java                     ← 认证服务接口
@@ -138,6 +153,8 @@ src/main/java/com/duyell/communityfreshdelivery/
     ├── DeliveryService.java                 ← 配送服务接口
     ├── OrderService.java                    ← 订单服务接口（含商家接单分拣）
     ├── PaymentService.java                  ← 支付服务接口（策略模式）
+    ├── GroupLeaderApplicationService.java  ← 团长申请与核销服务接口
+    ├── ReviewService.java                    ← 评价服务接口
     ├── ProductService.java                  ← 商品服务接口
     └── impl/
         ├── AuthServiceImpl.java             ← 认证服务实现
@@ -147,7 +164,10 @@ src/main/java/com/duyell/communityfreshdelivery/
         ├── DeliveryServiceImpl.java         ← 配送服务实现（抢单/取货/送达）
         ├── MockPaymentServiceImpl.java      ← 模拟支付实现
         ├── OrderServiceImpl.java            ← 订单服务实现（下单/商家操作）
+        ├── GroupLeaderApplicationServiceImpl.java ← 团长申请与核销服务实现
+        ├── PickupTimeoutScheduler.java          ← 自提超时退回定时任务
         ├── OrderTimeoutConsumer.java        ← 订单超时取消消费者（RabbitMQ）
+        ├── ReviewServiceImpl.java               ← 评价服务实现
         └── ProductServiceImpl.java          ← 商品服务实现
 ```
 
@@ -468,6 +488,7 @@ src/main/java/com/duyell/communityfreshdelivery/
 | 项目 | 说明 |
 |------|------|
 | **文件** | `ProductSku.java` |
+│   │   └── SysConfig.java                       ← sys_config 表（系统配置）
 | **映射** | `@TableName("product_sku")` |
 | **字段** | id / productId / specName / price（DECIMAL）/ stock / stockThreshold / status / createTime / updateTime / deleted |
 

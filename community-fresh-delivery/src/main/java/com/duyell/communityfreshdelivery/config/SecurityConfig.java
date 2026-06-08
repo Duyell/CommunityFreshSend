@@ -56,6 +56,10 @@ public class SecurityConfig {
             // 分类/商品浏览 — URL 层全放行，鉴权由 @PreAuthorize 控制
             "/api/category/**",
             "/api/product/**",
+            // 自提点列表 — 下单前即可查看
+            "/api/pickup-point/**",
+            // 商品评价 — 公开浏览
+            "/api/review/product/**",
             // Knife4j
             "/doc.html",
             "/swagger-ui/**",

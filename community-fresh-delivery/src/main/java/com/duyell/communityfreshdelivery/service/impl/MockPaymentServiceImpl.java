@@ -7,6 +7,7 @@ import com.duyell.communityfreshdelivery.entity.Payment;
 import com.duyell.communityfreshdelivery.enums.OrderStatus;
 import com.duyell.communityfreshdelivery.mapper.OrderMapper;
 import com.duyell.communityfreshdelivery.mapper.PaymentMapper;
+import com.duyell.communityfreshdelivery.service.OperationLogService;
 import com.duyell.communityfreshdelivery.service.OrderService;
 import com.duyell.communityfreshdelivery.service.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class MockPaymentServiceImpl implements PaymentService {
     private final OrderMapper orderMapper;
     private final PaymentMapper paymentMapper;
     private final OrderService orderService;
+    private final OperationLogService operationLogService;
 
     private static final char[] PAYNO_CHARS = "ABCDEFGHJKMNPQRSTUVWXY3456789".toCharArray();
     private static final int PAYNO_RANDOM_LEN = 10;
@@ -45,10 +47,20 @@ public class MockPaymentServiceImpl implements PaymentService {
     public void pay(Long orderId) {
         Long userId = SecurityUtil.currentUserId();
         Order order = orderMapper.selectById(orderId);
+
         if (order == null || !order.getUserId().equals(userId)) {
             throw new BusinessException(20006, "订单不存在");
         }
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT.getCode()) {
+
+        // 原子更新订单状态（防并发重复支付）
+        int updated = orderMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
+                        .eq(Order::getId, orderId)
+                        .eq(Order::getStatus, OrderStatus.PENDING_PAYMENT.getCode())
+                        .set(Order::getStatus, OrderStatus.PENDING_ACCEPT.getCode())
+                        .set(Order::getPaidTime, LocalDateTime.now())
+        );
+        if (updated == 0) {
             throw new BusinessException(20008, "当前订单状态不可支付");
         }
 
@@ -66,13 +78,16 @@ public class MockPaymentServiceImpl implements PaymentService {
         payment.setPaidTime(LocalDateTime.now());
         paymentMapper.insert(payment);
 
-        // 更新订单状态
-        order.setStatus(OrderStatus.PENDING_ACCEPT.getCode());
-        order.setPaidTime(LocalDateTime.now());
-        orderMapper.updateById(order);
-
         log.info("模拟支付成功: userId={} orderNo={} payNo={} amount={}",
                 userId, order.getOrderNo(), payNo, order.getActualAmount());
+
+        operationLogService.record(userId,
+                OperationLogService.ORDER_PAY,
+                OperationLogService.TARGET_ORDER,
+                orderId,
+                OrderStatus.PENDING_PAYMENT.getText(),
+                OrderStatus.PENDING_ACCEPT.getText(),
+                "支付成功，流水号:" + payNo);
     }
 
     @Override

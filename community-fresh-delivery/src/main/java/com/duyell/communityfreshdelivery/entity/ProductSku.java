@@ -36,12 +36,6 @@ public class ProductSku {
     /** 售价 */
     private BigDecimal price;
 
-    /** 当前库存 */
-    private Integer stock;
-
-    /** 库存预警阈值 */
-    private Integer stockThreshold;
-
     /** 状态：1=启用 0=停用 */
     private Integer status;
 

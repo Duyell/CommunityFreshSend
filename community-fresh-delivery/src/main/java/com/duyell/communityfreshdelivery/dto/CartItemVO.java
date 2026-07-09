@@ -43,4 +43,7 @@ public class CartItemVO {
 
     /** 库存是否充足：true=库存足够 false=库存不足 */
     private Boolean stockSufficient;
+
+    /** 临期折扣价（null=非临期商品） */
+    private BigDecimal nearExpiryDiscount;
 }

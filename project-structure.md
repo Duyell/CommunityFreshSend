@@ -2,7 +2,7 @@
 # 项目结构文档
 
 > 社区生鲜配送系统 — 完整项目文件索引与功能说明  
-> 更新日期：2026-06-08（第八步完成）
+> 更新日期：2026-07-09（Bug 修复 + React 前端完成）
 
 ---
 
@@ -11,6 +11,7 @@
 | 路径 | 说明 |
 |------|------|
 | `community-fresh-delivery/` | Spring Boot 后端工程根目录 |
+| `fresh-market-frontend/` | React 前端工程根目录（TypeScript + Vite + Tailwind CSS） |
 | `function.md` | 需求文档（业务目标 + 技术目标 + 订单状态机 + 分阶段规划） |
 | `devlog.md` | 开发日志（按日记录 + 当前进度 + 待办清单） |
 | `project-structure.md` | 项目结构文档（本文件 — 逐文件功能说明） |
@@ -61,6 +62,10 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   │   ├── JwtAuthenticationFilter.java     ← JWT 认证过滤器
 │   │   ├── UserDetailsImpl.java             ← Spring Security 用户适配
 │   │   └── UserDetailsServiceImpl.java      ← 用户加载服务
+│   ├── annotation/
+│   │   └── RateLimit.java                   ← 接口限流注解
+│   ├── aop/
+│   │   └── RateLimitAspect.java             ← 限流 AOP 切面（Redis 滑动窗口）
 │   └── utils/
 │       ├── JwtUtil.java                     ← JWT 工具类
 │       ├── OrderNoUtil.java                 ← 订单编号生成器（22位）
@@ -82,6 +87,13 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── GroupLeaderApplicationController.java ← 团长接口（申请/审核/核销）
 │   ├── PickupPointController.java           ← 自提点接口（列表/详情）
 │   ├── ReviewController.java                  ← 评价接口（创建/查询）
+│   ├── CouponController.java                    ← 优惠券接口（管理端+用户端+领券中心）
+│   ├── NotificationController.java              ← 站内消息接口
+│   ├── ProductBatchController.java              ← 批次库存接口（商家端）
+│   ├── DeliveryApplicationController.java       ← 配送员申请接口
+│   ├── FavoriteController.java                  ← 收藏夹接口
+│   ├── DashboardController.java                 ← 数据看板接口（商家端）
+│   ├── CommissionController.java                ← 团长佣金接口
 │   ├── ProductController.java               ← 商品接口（CRUD + 分页 + 用户端列表）
 │
 ├── dto/                                     ← 数据传输对象
@@ -107,7 +119,24 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── GroupLeaderReviewDTO.java            ← 团长审核请求
 │   ├── ReviewCreateDTO.java                  ← 评价创建请求
 │   ├── ReviewVO.java                         ← 评价响应
-│   └── PickupCodeDTO.java                   ← 提货码核销请求
+│   ├── PickupCodeDTO.java                   ← 提货码核销请求
+│   ├── CouponSaveDTO.java                      ← 优惠券模板请求
+│   ├── CouponIssueDTO.java                     ← 发券请求
+│   ├── CouponVO.java                           ← 券模板响应
+│   ├── UserCouponVO.java                       ← 用户持券响应
+│   ├── NotificationVO.java                    ← 站内消息响应
+│   ├── ProductBatchSaveDTO.java               ← 批次入库请求
+│   ├── ProductBatchVO.java                    ← 批次响应
+│   ├── DeliveryApplyDTO.java                  ← 配送员申请请求
+│   ├── DeliveryReviewDTO.java                 ← 配送员审核请求
+│   ├── DeliveryApplicationVO.java              ← 配送员申请响应
+│   ├── SortItemDTO.java                       ← 分拣明细请求
+│   ├── FavoriteVO.java                        ← 收藏夹响应
+│   ├── DashboardVO.java                       ← 今日概况
+│   ├── SalesStatsVO.java                      ← 销量统计
+│   ├── HotProductVO.java                      ← 热销商品
+│   ├── CommissionVO.java                      ← 佣金概览
+│   └── CommissionDetailVO.java                ← 佣金明细
 │
 ├── entity/                                  ← 数据库实体
 │   ├── User.java                            ← user 表
@@ -122,7 +151,16 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── Review.java                           ← review 表（商品评价）
 │   ├── Product.java                         ← product 表
 │   ├── ProductSku.java                      ← product_sku 表
-│   └── SysConfig.java                       ← sys_config 表（系统配置）
+│   ├── SysConfig.java                       ← sys_config 表（系统配置）
+│   ├── Review.java                          ← review 表（商品评价）
+│   ├── Coupon.java                          ← coupon 表（优惠券模板）
+│   ├── UserCoupon.java                      ← user_coupon 表（用户持有券）
+│   ├── Notification.java                    ← notification 表（站内消息）
+│   ├── ProductBatch.java                    ← product_batch 表（批次库存）
+│   ├── OperationLog.java                    ← operation_log 表（操作日志）
+│   ├── DeliveryApplication.java             ← delivery_application 表（配送员申请）
+│   ├── Favorite.java                        ← favorite 表（收藏夹）
+│   └── CommissionRecord.java                ← commission_record 表（团长佣金）
 
 ├── enums/                                   ← 枚举
 │   ├── DeliveryStatus.java                  ← 配送状态（待取货/配送中/已送达）
@@ -141,6 +179,14 @@ src/main/java/com/duyell/communityfreshdelivery/
 │   ├── PickupPointMapper.java               ← 继承 BaseMapper<PickupPoint>
 │   ├── ProductMapper.java                   ← 继承 BaseMapper<Product>
 │   ├── ReviewMapper.java                     ← 继承 BaseMapper<Review>
+│   ├── CouponMapper.java                       ← 继承 BaseMapper<Coupon>
+│   ├── UserCouponMapper.java                   ← 继承 BaseMapper<UserCoupon>
+│   ├── NotificationMapper.java                 ← 继承 BaseMapper<Notification>
+│   ├── ProductBatchMapper.java                 ← 继承 BaseMapper<ProductBatch>
+│   ├── OperationLogMapper.java                ← 继承 BaseMapper<OperationLog>
+│   ├── DeliveryApplicationMapper.java         ← 继承 BaseMapper<DeliveryApplication>
+│   ├── FavoriteMapper.java                    ← 继承 BaseMapper<Favorite>
+│   ├── CommissionRecordMapper.java            ← 继承 BaseMapper<CommissionRecord>
 │   ├── ProductSkuMapper.java                ← 继承 BaseMapper<ProductSku> + deleteByProductId/deductStock/addStock
 │   ├── GroupLeaderApplicationMapper.java   ← 继承 BaseMapper<GroupLeaderApplication>
 │   └── SysConfigMapper.java                 ← 继承 BaseMapper<SysConfig>
@@ -168,6 +214,16 @@ src/main/java/com/duyell/communityfreshdelivery/
         ├── PickupTimeoutScheduler.java          ← 自提超时退回定时任务
         ├── OrderTimeoutConsumer.java        ← 订单超时取消消费者（RabbitMQ）
         ├── ReviewServiceImpl.java               ← 评价服务实现
+        ├── CouponServiceImpl.java               ← 优惠券服务实现
+        ├── NotificationServiceImpl.java         ← 站内消息服务实现
+        ├── OperationLogServiceImpl.java         ← 操作日志服务实现
+        ├── ProductBatchServiceImpl.java         ← 批次库存服务实现
+        ├── BatchExpiryScheduler.java            ← 临期+低库存定时预警
+        ├── DeliveryApplicationServiceImpl.java  ← 配送员申请服务实现
+        ├── FavoriteServiceImpl.java             ← 收藏夹服务实现
+        ├── DashboardServiceImpl.java            ← 数据看板服务实现
+        ├── CommissionServiceImpl.java           ← 团长佣金服务实现
+        ├── PaymentReconciliationScheduler.java  ← 支付对账定时任务
         └── ProductServiceImpl.java          ← 商品服务实现
 ```
 
@@ -552,3 +608,82 @@ src/main/java/com/duyell/communityfreshdelivery/
 | `CartServiceTest.java` | 购物车集成测试 — 8 个用例：加购累加/改数量/删单品/清空/多商品/空购物车/用户隔离（`@SpringBootTest`） |
 | `OrderServiceTest.java` | 订单集成测试 — 12 个用例：下单/自提/空购物车/库存不足/起送价/支付/重复支付/取消支付/取消订单/详情/用户隔离/分页（`@SpringBootTest`） |
 | `DeliveryServiceTest.java` | 配送集成测试 — 9 个用例：接单大厅/抢单/重复抢单/取货送达/角色隔离/我的配送/大厅过滤/无记录校验（`@SpringBootTest`） |
+
+---
+
+## 11. React 前端 — `fresh-market-frontend/`
+
+### 技术栈
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| React | 19.x | UI 框架 |
+| TypeScript | 5.x | 类型安全 |
+| Vite | 8.x | 构建工具 |
+| Tailwind CSS | 4.x | 原子化 CSS |
+| React Router | 7.x | 客户端路由 |
+| Axios | 1.x | HTTP 请求 |
+
+### 目录结构
+
+```
+fresh-market-frontend/
+  src/
+    api/                    ← API 调用层
+      client.ts             ← Axios 实例（JWT 自动注入 + 401 拦截跳转登录）
+      auth.ts               ← 登录/注册 API
+      product.ts            ← 商品/分类浏览 API
+      cart.ts               ← 购物车 API（Redis 后端）
+      order.ts              ← 下单/支付/取消/优惠券 API
+      address.ts            ← 收货地址 CRUD API
+    components/
+      Layout.tsx             ← 全局布局（顶部导航 + 移动端菜单 + 底部）
+    pages/
+      Login.tsx              ← 登录页（手机号+密码）
+      Register.tsx           ← 注册页（手机号+密码+昵称）
+      Home.tsx               ← 首页：商品网格/分类筛选/搜索/排序/分页/加购
+      ProductDetail.tsx      ← 商品详情：SKU 选择/数量/加购/立即购买
+      Cart.tsx               ← 购物车：数量调整/删除/结算
+      Checkout.tsx           ← 下单：配送方式/地址/时间/优惠券/费用明细
+      Orders.tsx             ← 订单列表：状态筛选/支付/取消快捷操作
+      OrderDetail.tsx        ← 订单详情：取货码/费用明细/状态操作
+    types/
+      index.ts               ← TypeScript 类型定义（ProductVO/OrderVO 等 15+ 类型）
+    App.tsx                   ← 路由配置（React Router，8 条路由）
+    main.tsx                  ← 入口文件
+    index.css                 ← Tailwind CSS 入口
+  vite.config.ts             ← Vite 配置（端口 3000 + /api 代理到 localhost:8080）
+  package.json
+```
+
+### 页面路由
+
+| 路径 | 页面 | 认证 |
+|------|------|------|
+| `/login` | 登录 | 公开 |
+| `/register` | 注册 | 公开 |
+| `/` | 商品浏览首页 | 公开 |
+| `/product/:id` | 商品详情 | 公开 |
+| `/cart` | 购物车 | 需登录 |
+| `/checkout` | 确认下单 | 需登录 |
+| `/orders` | 我的订单 | 需登录 |
+| `/orders/:id` | 订单详情 | 需登录 |
+
+### UI 规范
+
+- **主色调**: Emerald 绿（`emerald-600`），体现生鲜新鲜感
+- **设计风格**: 简洁现代，圆角卡片式布局
+- **响应式**: 移动端自适应（`md:grid-cols-3 lg:grid-cols-4`）
+- **加载态**: 骨架屏（skeleton pulse animation）
+- **空状态**: 友好的空状态插图 + 引导文案
+
+### 启动命令
+
+```bash
+cd fresh-market-frontend
+npm install
+npm run dev          # 开发模式，端口 3000
+npm run build        # 生产构建
+```
+
+> **后端代理**：开发模式下 Vite 自动将 `/api` 请求代理到 `http://localhost:8080`，无需额外配置。

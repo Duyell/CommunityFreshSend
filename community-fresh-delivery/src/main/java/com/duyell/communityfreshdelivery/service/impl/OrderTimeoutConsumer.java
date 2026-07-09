@@ -1,12 +1,15 @@
 package com.duyell.communityfreshdelivery.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.duyell.communityfreshdelivery.dto.OrderTimeoutMessage;
 import com.duyell.communityfreshdelivery.entity.Order;
 import com.duyell.communityfreshdelivery.entity.OrderItem;
 import com.duyell.communityfreshdelivery.enums.OrderStatus;
 import com.duyell.communityfreshdelivery.mapper.OrderItemMapper;
 import com.duyell.communityfreshdelivery.mapper.OrderMapper;
-import com.duyell.communityfreshdelivery.mapper.ProductSkuMapper;
+import com.duyell.communityfreshdelivery.mapper.ProductBatchMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +28,12 @@ import java.util.List;
  * <p>监听 {@code order.auto.cancel} 队列，收到延迟消息后检查订单状态：
  * 仍为待付款(0)则自动取消 + 回补库存，已支付则忽略.</p>
  *
+ * <h3>库存回补策略（与 {@link OrderServiceImpl#cancel} 保持一致）</h3>
+ * <ol>
+ *   <li>优先使用 {@code batchAllocations} JSON 逐批精确回补（原子 UPDATE）</li>
+ *   <li>兼容旧数据：仅记录了 {@code batchId} 的订单，全量回补到该批次</li>
+ * </ol>
+ *
  * @author duyell
  * @since 2026-06-07
  */
@@ -35,9 +44,14 @@ public class OrderTimeoutConsumer {
 
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
-    private final ProductSkuMapper productSkuMapper;
+    private final ProductBatchMapper productBatchMapper;
 
-    @RabbitListener(queues = "${app.biz.auto-cancel-queue}")
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    /** 批次分配明细条目，用于 JSON 反序列化 */
+    private record BatchAlloc(long bid, int qty) {}
+
+    @RabbitListener(queues = "${app.mq.auto-cancel-queue}")
     @Transactional(rollbackFor = Exception.class)
     public void handleTimeout(OrderTimeoutMessage message, Channel channel,
                               @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
@@ -64,13 +78,29 @@ public class OrderTimeoutConsumer {
         order.setCancelReason("超时未支付，系统自动取消");
         orderMapper.updateById(order);
 
-        // 回补库存
+        // 回补批次库存（与 OrderServiceImpl.cancel() 保持一致）
         List<OrderItem> items = orderItemMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>()
+                new LambdaQueryWrapper<OrderItem>()
                         .eq(OrderItem::getOrderId, order.getId())
         );
         for (OrderItem item : items) {
-            productSkuMapper.addStock(item.getSkuId(), item.getQuantity());
+            String allocJson = item.getBatchAllocations();
+            if (allocJson != null && !allocJson.isBlank()) {
+                // 新逻辑：按 batchAllocations 逐批精确回补（原子 UPDATE）
+                try {
+                    List<BatchAlloc> allocs = OBJECT_MAPPER.readValue(
+                            allocJson, new TypeReference<List<BatchAlloc>>() {});
+                    for (BatchAlloc a : allocs) {
+                        productBatchMapper.addRemaining(a.bid(), a.qty());
+                    }
+                } catch (Exception e) {
+                    log.error("解析批次分配明细失败: orderItemId={} json={}", item.getId(), allocJson, e);
+                    // 解析失败不阻塞其他订单项的库存回补
+                }
+            } else if (item.getBatchId() != null) {
+                // 兼容旧订单：仅记录了第一个 batchId，全量回补（原子 UPDATE）
+                productBatchMapper.addRemaining(item.getBatchId(), item.getQuantity());
+            }
         }
 
         channel.basicAck(deliveryTag, false);

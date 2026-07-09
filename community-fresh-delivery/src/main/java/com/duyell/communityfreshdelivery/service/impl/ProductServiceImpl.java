@@ -6,17 +6,22 @@ import com.duyell.communityfreshdelivery.common.exception.BusinessException;
 import com.duyell.communityfreshdelivery.dto.ProductSaveDTO;
 import com.duyell.communityfreshdelivery.dto.ProductVO;
 import com.duyell.communityfreshdelivery.entity.Product;
+import com.duyell.communityfreshdelivery.entity.ProductBatch;
 import com.duyell.communityfreshdelivery.entity.ProductSku;
+import com.duyell.communityfreshdelivery.mapper.ProductBatchMapper;
 import com.duyell.communityfreshdelivery.mapper.ProductMapper;
 import com.duyell.communityfreshdelivery.mapper.ProductSkuMapper;
 import com.duyell.communityfreshdelivery.service.ProductService;
+import com.duyell.communityfreshdelivery.service.SysConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
-import java.util.List;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * <h2>商品服务实现</h2>
@@ -38,6 +43,8 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductMapper productMapper;
     private final ProductSkuMapper productSkuMapper;
+    private final ProductBatchMapper productBatchMapper;
+    private final SysConfigService sysConfigService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -127,7 +134,9 @@ public class ProductServiceImpl implements ProductService {
                         .orderByAsc(ProductSku::getId)
         );
 
-        return toVO(product, skus);
+        ProductVO vo = toVO(product, skus);
+        enrichTotalStock(List.of(vo));
+        return vo;
     }
 
     @Override
@@ -199,6 +208,10 @@ public class ProductServiceImpl implements ProductService {
                     ? allVOs.subList(fromIndex, toIndex)
                     : List.of();
 
+            // 填充临期折扣和总库存
+            enrichNearExpiryDiscount(pageVOs);
+            enrichTotalStock(pageVOs);
+
             Page<ProductVO> voPage = new Page<>(page, size, total);
             voPage.setRecords(pageVOs);
             return voPage;
@@ -207,7 +220,9 @@ public class ProductServiceImpl implements ProductService {
         // 时间排序（默认）：直接用 MyBatis-Plus 分页
         wrapper.orderByDesc(Product::getCreateTime);
         Page<Product> result = productMapper.selectPage(new Page<>(page, size), wrapper);
-        return toVOPage(result);
+        Page<ProductVO> voPage = toVOPage(result);
+        enrichNearExpiryDiscount(voPage.getRecords());
+        return voPage;
     }
 
     // ==================== 内部方法 ====================
@@ -220,8 +235,6 @@ public class ProductServiceImpl implements ProductService {
                     sku.setProductId(productId);
                     sku.setSpecName(item.getSpecName());
                     sku.setPrice(item.getPrice());
-                    sku.setStock(item.getStock());
-                    sku.setStockThreshold(10);
                     sku.setStatus(1);
                     return sku;
                 })
@@ -241,7 +254,6 @@ public class ProductServiceImpl implements ProductService {
                         .id(s.getId())
                         .specName(s.getSpecName())
                         .price(s.getPrice())
-                        .stock(s.getStock())
                         .build())
                 .toList();
 
@@ -277,9 +289,84 @@ public class ProductServiceImpl implements ProductService {
         List<ProductVO> voList = productPage.getRecords().stream()
                 .map(this::toVOWithSkus)
                 .toList();
+        enrichTotalStock(voList);
         Page<ProductVO> voPage = new Page<>(productPage.getCurrent(), productPage.getSize(), productPage.getTotal());
         voPage.setRecords(voList);
         return voPage;
+    }
+
+    /**
+     * 填充临期折扣价.
+     * 查哪些商品有临期批次（remaining > 0），计算折扣后填入 nearExpiryDiscount 字段.
+     */
+    private void enrichNearExpiryDiscount(List<ProductVO> vos) {
+        if (vos.isEmpty()) {
+            return;
+        }
+
+        Set<Long> productIds = vos.stream()
+                .map(ProductVO::getId)
+                .collect(Collectors.toSet());
+
+        // 查哪些商品有临期批次（remaining > 0）
+        List<ProductBatch> nearBatches = productBatchMapper.selectList(
+                new LambdaQueryWrapper<ProductBatch>()
+                        .in(ProductBatch::getProductId, productIds)
+                        .eq(ProductBatch::getNearExpiry, 1)
+                        .gt(ProductBatch::getRemaining, 0)
+        );
+        Set<Long> nearProductIds = nearBatches.stream()
+                .map(ProductBatch::getProductId)
+                .collect(Collectors.toSet());
+
+        if (nearProductIds.isEmpty()) {
+            return;
+        }
+
+        BigDecimal discountRate = readNearExpiryDiscountRate();
+
+        for (ProductVO vo : vos) {
+            if (nearProductIds.contains(vo.getId()) && vo.getMinPrice() != null) {
+                BigDecimal discount = vo.getMinPrice().multiply(discountRate)
+                        .setScale(2, RoundingMode.DOWN);
+                vo.setNearExpiryDiscount(discount);
+            }
+        }
+    }
+
+    /** 读取临期折扣率，默认 0.70（7折） */
+    private BigDecimal readNearExpiryDiscountRate() {
+        return sysConfigService.getDecimal("near_expiry_discount", "0.70");
+    }
+
+    /**
+     * 填充总库存（从 product_batch 汇总）.
+     * 批量查所有商品的批次 remaining 合计，填入 ProductVO.totalStock.
+     */
+    private void enrichTotalStock(List<ProductVO> vos) {
+        if (vos.isEmpty()) {
+            return;
+        }
+
+        Set<Long> productIds = vos.stream()
+                .map(ProductVO::getId)
+                .collect(Collectors.toSet());
+
+        // 按 product_id GROUP BY 汇总 remaining
+        List<ProductBatch> allBatches = productBatchMapper.selectList(
+                new LambdaQueryWrapper<ProductBatch>()
+                        .in(ProductBatch::getProductId, productIds)
+                        .gt(ProductBatch::getRemaining, 0)
+        );
+        Map<Long, Integer> stockMap = allBatches.stream()
+                .collect(Collectors.groupingBy(
+                        ProductBatch::getProductId,
+                        Collectors.summingInt(ProductBatch::getRemaining)
+                ));
+
+        for (ProductVO vo : vos) {
+            vo.setTotalStock(stockMap.getOrDefault(vo.getId(), 0));
+        }
     }
 
 }

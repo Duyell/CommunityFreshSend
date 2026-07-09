@@ -3,6 +3,9 @@ package com.duyell.communityfreshdelivery.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.duyell.communityfreshdelivery.dto.OrderCreateDTO;
 import com.duyell.communityfreshdelivery.dto.OrderVO;
+import com.duyell.communityfreshdelivery.dto.SortItemDTO;
+
+import java.util.List;
 
 /**
  * <h2>订单服务</h2>
@@ -59,9 +62,11 @@ public interface OrderService {
 
     /**
      * 商家分拣完成（status 2→3），订单进入待配送.
+     * 逐项确认称重实重和缺货情况，计算称重差异金额（多退少补）.
      * Controller 层 {@code @PreAuthorize("hasRole('MERCHANT')")} 控制权限.
      *
      * @param orderId 订单ID
+     * @param items   分拣明细（含实重/缺货标记）
      */
-    void sortComplete(Long orderId);
+    void sortComplete(Long orderId, List<SortItemDTO> items);
 }

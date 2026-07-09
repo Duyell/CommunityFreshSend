@@ -117,8 +117,6 @@ CREATE TABLE `product_sku` (
     `product_id`  BIGINT        NOT NULL                COMMENT '商品ID',
     `spec_name`   VARCHAR(100)  DEFAULT '默认规格'       COMMENT '规格名称（如"300g/盒"、"散称"）',
     `price`       DECIMAL(10,2) NOT NULL                COMMENT '售价',
-    `stock`       INT           DEFAULT 0               COMMENT '当前库存',
-    `stock_threshold` INT       DEFAULT 10              COMMENT '库存预警阈值',
     `status`      TINYINT       DEFAULT 1               COMMENT '状态：1=启用 0=停用',
     `create_time` DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
@@ -193,6 +191,7 @@ CREATE TABLE `order_item` (
     `order_id`        BIGINT        NOT NULL                COMMENT '订单ID',
     `product_id`      BIGINT        NOT NULL                COMMENT '商品ID',
     `sku_id`          BIGINT        NOT NULL                COMMENT '规格ID',
+    `batch_id`        BIGINT        DEFAULT NULL            COMMENT '出库批次ID',
     `product_name`    VARCHAR(100)  NOT NULL                COMMENT '商品名称快照',
     `spec_name`       VARCHAR(100)  DEFAULT ''              COMMENT '规格名称快照',
     `price`           DECIMAL(10,2) NOT NULL                COMMENT '下单时单价',
@@ -206,7 +205,8 @@ CREATE TABLE `order_item` (
     `deleted`         TINYINT       DEFAULT 0               COMMENT '逻辑删除',
     PRIMARY KEY (`id`),
     KEY `idx_order_id` (`order_id`),
-    KEY `idx_sku_id` (`sku_id`)
+    KEY `idx_sku_id` (`sku_id`),
+    KEY `idx_batch_id` (`batch_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单明细表';
 
 -- 5.3 支付流水表
@@ -397,6 +397,62 @@ CREATE TABLE `operation_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志表';
 
 -- ============================================
+-- 13. 配送员申请
+-- ============================================
+
+CREATE TABLE `delivery_application` (
+    `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '申请ID',
+    `user_id`       BIGINT       NOT NULL                COMMENT '申请人用户ID',
+    `real_name`     VARCHAR(20)  NOT NULL                COMMENT '真实姓名',
+    `phone`         VARCHAR(20)  NOT NULL                COMMENT '联系电话',
+    `remark`        VARCHAR(255) DEFAULT ''              COMMENT '附言',
+    `status`        TINYINT      DEFAULT 0               COMMENT '审核状态：0=待审核 1=已通过 2=已拒绝',
+    `reject_reason` VARCHAR(255) DEFAULT ''              COMMENT '拒绝原因',
+    `reviewed_time` DATETIME     DEFAULT NULL            COMMENT '审核时间',
+    `create_time`   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '申请时间',
+    `update_time`   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `deleted`       TINYINT      DEFAULT 0               COMMENT '逻辑删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='配送员申请表';
+
+-- ============================================
+-- 14. 收藏夹
+-- ============================================
+
+CREATE TABLE `favorite` (
+    `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '收藏ID',
+    `user_id`     BIGINT   NOT NULL                COMMENT '用户ID',
+    `product_id`  BIGINT   NOT NULL                COMMENT '商品ID',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+    `deleted`     TINYINT  DEFAULT 0               COMMENT '逻辑删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_product` (`user_id`, `product_id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='收藏夹表';
+
+-- ============================================
+-- 15. 团长佣金
+-- ============================================
+
+CREATE TABLE `commission_record` (
+    `id`              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '佣金ID',
+    `user_id`         BIGINT        NOT NULL                COMMENT '团长用户ID',
+    `pickup_point_id` BIGINT        NOT NULL                COMMENT '自提点ID',
+    `order_id`        BIGINT        NOT NULL                COMMENT '关联订单ID',
+    `order_amount`    DECIMAL(10,2) NOT NULL                COMMENT '订单金额',
+    `rate`            DECIMAL(5,4)  NOT NULL                COMMENT '佣金比例（如 0.05 = 5%）',
+    `amount`          DECIMAL(10,2) NOT NULL                COMMENT '佣金金额',
+    `status`          TINYINT       DEFAULT 0               COMMENT '状态：0=未提现 1=已提现',
+    `withdraw_time`   DATETIME      DEFAULT NULL            COMMENT '提现时间',
+    `create_time`     DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `deleted`         TINYINT       DEFAULT 0               COMMENT '逻辑删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_order_id` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='团长佣金记录表';
+
+-- ============================================
 -- 初始数据
 -- ============================================
 
@@ -425,12 +481,12 @@ INSERT INTO `product` (`id`, `category_id`, `name`, `description`, `images`, `st
 (4, 10, '猪五花肉',   '当日鲜切，肥瘦均匀',        '["pork1.jpg"]',       1, 0);
 
 -- 商品规格
-INSERT INTO `product_sku` (`product_id`, `spec_name`, `price`, `stock`) VALUES
-(1, '300g/盒',  19.90, 100),
-(1, '500g/盒',  29.90, 50),
-(2, '散称（约1.5kg/个）', 8.00, 200),
-(3, '250g/颗',   5.90, 150),
-(4, '500g/份',  22.00, 80);
+INSERT INTO `product_sku` (`product_id`, `spec_name`, `price`) VALUES
+(1, '300g/盒',  19.90),
+(1, '500g/盒',  29.90),
+(2, '散称（约1.5kg/个）', 8.00),
+(3, '250g/颗',   5.90),
+(4, '500g/份',  22.00);
 
 -- 测试用户（密码明文均为 "123456"，hash 由 BcryptPasswordGeneratorTest 生成）
 INSERT INTO `user` (`id`, `phone`, `password`, `nickname`) VALUES
@@ -446,6 +502,14 @@ INSERT INTO `user_role` (`user_id`, `role`) VALUES
 (3, 'ROLE_MERCHANT'),
 (4, 'ROLE_ADMIN');
 
+-- 测试批次库存（商品库存的唯一来源）
+INSERT INTO `product_batch` (`product_id`, `batch_no`, `cost_price`, `quantity`, `remaining`, `production_date`, `expiry_date`) VALUES
+(1, 'B20260601-001', 12.00, 100, 100, '2026-06-01', '2026-06-15'),
+(1, 'B20260605-001', 11.00, 50,  50,  '2026-06-05', '2026-06-20'),
+(2, 'B20260601-002', 5.00,  200, 200, '2026-06-01', '2026-06-10'),
+(3, 'B20260601-003', 3.00,  150, 150, '2026-06-01', '2026-06-12'),
+(4, 'B20260601-004', 15.00, 80,  80,  '2026-06-01', '2026-06-18');
+
 -- 系统配置
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('delivery_fee', '5.00', '基础配送费（元）'),
@@ -453,4 +517,6 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('min_order_amount', '15.00', '起送价（元）'),
 ('package_fee', '1.00', '包装费（元/单）'),
 ('order_timeout', '15', '订单超时自动取消（分钟）'),
-('pickup_timeout_days', '3', '自提超时未取退回天数');
+('pickup_timeout_days', '3', '自提超时未取退回天数'),
+('commission_rate', '0.05', '团长佣金比例（0.05=5%）'),
+('near_expiry_discount', '0.70', '临期折扣率（0.70=7折）');

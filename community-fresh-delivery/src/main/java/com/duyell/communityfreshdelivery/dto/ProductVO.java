@@ -44,8 +44,14 @@ public class ProductVO {
     /** 最低售价（列表页展示用，取 SKU 中最小的 price） */
     private BigDecimal minPrice;
 
+    /** 总库存（从 product_batch 汇总，列表页展示"仅剩X件"） */
+    private Integer totalStock;
+
     /** 创建时间 */
     private LocalDateTime createTime;
+
+    /** 临期折扣价（仅临期商品的列表页有值，null=无临期折扣） */
+    private BigDecimal nearExpiryDiscount;
 
     /** 规格列表（列表页为 null） */
     private List<SkuVO> skus;
@@ -62,7 +68,5 @@ public class ProductVO {
         private String specName;
         /** 售价 */
         private BigDecimal price;
-        /** 库存 */
-        private Integer stock;
     }
 }

@@ -1,9 +1,13 @@
 package com.duyell.communityfreshdelivery.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.duyell.communityfreshdelivery.common.annotation.RateLimit;
 import com.duyell.communityfreshdelivery.common.result.Result;
 import com.duyell.communityfreshdelivery.dto.OrderCreateDTO;
 import com.duyell.communityfreshdelivery.dto.OrderVO;
+import com.duyell.communityfreshdelivery.dto.SortItemDTO;
+
+import java.util.List;
 import com.duyell.communityfreshdelivery.service.OrderService;
 import com.duyell.communityfreshdelivery.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,6 +43,7 @@ public class OrderController {
 
     @PostMapping
     @Operation(summary = "提交订单")
+    @RateLimit(key = "order:place", limit = 5, window = 60, message = "下单过于频繁，请60秒后再试")
     public Result<OrderVO> place(@Valid @RequestBody OrderCreateDTO dto) {
         OrderVO vo = orderService.place(dto);
         return Result.ok("下单成功", vo);
@@ -91,10 +96,11 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/sort-complete")
-    @Operation(summary = "商家分拣完成")
+    @Operation(summary = "商家分拣完成（含称重实重+缺货标记）")
     @PreAuthorize("hasRole('MERCHANT')")
-    public Result<Void> sortComplete(@PathVariable Long id) {
-        orderService.sortComplete(id);
+    public Result<Void> sortComplete(@PathVariable Long id,
+                                      @RequestBody(required = false) List<SortItemDTO> items) {
+        orderService.sortComplete(id, items);
         return Result.ok("分拣完成", null);
     }
 }

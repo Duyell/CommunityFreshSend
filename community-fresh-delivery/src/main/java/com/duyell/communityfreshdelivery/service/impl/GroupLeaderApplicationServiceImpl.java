@@ -11,12 +11,15 @@ import com.duyell.communityfreshdelivery.entity.GroupLeaderApplication;
 import com.duyell.communityfreshdelivery.entity.Order;
 import com.duyell.communityfreshdelivery.entity.PickupPoint;
 import com.duyell.communityfreshdelivery.entity.UserRole;
+import com.duyell.communityfreshdelivery.enums.ApplicationStatus;
 import com.duyell.communityfreshdelivery.enums.OrderStatus;
 import com.duyell.communityfreshdelivery.mapper.GroupLeaderApplicationMapper;
 import com.duyell.communityfreshdelivery.mapper.OrderMapper;
 import com.duyell.communityfreshdelivery.mapper.PickupPointMapper;
 import com.duyell.communityfreshdelivery.mapper.UserRoleMapper;
+import com.duyell.communityfreshdelivery.service.CommissionService;
 import com.duyell.communityfreshdelivery.service.GroupLeaderApplicationService;
+import com.duyell.communityfreshdelivery.service.OperationLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,15 +34,15 @@ import java.util.List;
  *
  * <h3>申请审核流程</h3>
  * <pre>{@code
- * 用户提交 apply() → status=0（待审核）
+ * 用户提交 apply() → status=PENDING（待审核）
  *   │
  *   ├── 管理员 approve:
  *   │     1. INSERT pickup_point（owner_type=2, owner_id=userId）
  *   │     2. INSERT user_role（ROLE_GROUP_LEADER）
- *   │     3. UPDATE application.status=1
+ *   │     3. UPDATE application.status=APPROVED
  *   │
  *   └── 管理员 reject:
- *         UPDATE application.status=2, reject_reason
+ *         UPDATE application.status=REJECTED, reject_reason
  * }</pre>
  *
  * <h3>提货码核销</h3>
@@ -60,9 +63,19 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
     private final PickupPointMapper pickupPointMapper;
     private final UserRoleMapper userRoleMapper;
     private final OrderMapper orderMapper;
+    private final OperationLogService operationLogService;
+    private final CommissionService commissionService;
 
     // ==================== 申请 ====================
 
+    /**
+     * 用户提交团长申请.
+     *
+     * <p>校验无待审核申请后创建新申请，状态为"待审核"(0).</p>
+     *
+     * @param dto 申请信息（地址/联系人/电话/附言）
+     * @return 申请记录
+     */
     @Override
     public GroupLeaderApplicationVO apply(GroupLeaderApplyDTO dto) {
         Long userId = SecurityUtil.currentUserId();
@@ -71,7 +84,7 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
         boolean hasPending = applicationMapper.exists(
                 new LambdaQueryWrapper<GroupLeaderApplication>()
                         .eq(GroupLeaderApplication::getUserId, userId)
-                        .eq(GroupLeaderApplication::getStatus, 0)
+                        .eq(GroupLeaderApplication::getStatus, ApplicationStatus.PENDING.getCode())
         );
         if (hasPending) {
             throw new BusinessException(40001, "您已有待审核的申请，请耐心等待");
@@ -83,7 +96,7 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
         entity.setContactName(dto.getContactName());
         entity.setContactPhone(dto.getContactPhone());
         entity.setRemark(dto.getRemark() != null ? dto.getRemark() : "");
-        entity.setStatus(0);
+        entity.setStatus(ApplicationStatus.PENDING.getCode());
 
         applicationMapper.insert(entity);
         log.info("团长申请已提交: userId={} id={}", userId, entity.getId());
@@ -91,6 +104,13 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
         return toVO(entity);
     }
 
+    /**
+     * 查询当前用户最新一条团长申请.
+     *
+     * <p>若从未申请过，返回 statusText="未申请" 的空 VO.</p>
+     *
+     * @return 最新申请记录（或空 VO）
+     */
     @Override
     public GroupLeaderApplicationVO myApplication() {
         Long userId = SecurityUtil.currentUserId();
@@ -108,11 +128,19 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
                     .build();
         }
 
-        return toVO(list.get(0));
+        return toVO(list.getFirst());
     }
 
     // ==================== 管理员审核 ====================
 
+    /**
+     * 管理员分页查询团长申请列表.
+     *
+     * @param page   页码
+     * @param size   每页条数
+     * @param status 状态筛选（null=全部）
+     * @return 分页结果
+     */
     @Override
     public Page<GroupLeaderApplicationVO> pageApplications(int page, int size, Integer status) {
         LambdaQueryWrapper<GroupLeaderApplication> wrapper =
@@ -135,6 +163,16 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
         return voPage;
     }
 
+    /**
+     * 管理员审核团长申请.
+     *
+     * <p>通过时自动创建自提点 + 追加 ROLE_GROUP_LEADER 角色 + 更新申请状态.
+     * 拒绝时需填写拒绝原因.</p>
+     *
+     * @param id  申请ID
+     * @param dto 审核信息（approved + rejectReason）
+     * @return 更新后的申请记录
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public GroupLeaderApplicationVO review(Long id, GroupLeaderReviewDTO dto) {
@@ -142,7 +180,7 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
         if (application == null) {
             throw new BusinessException(40002, "申请记录不存在");
         }
-        if (application.getStatus() != 0) {
+        if (application.getStatus() != ApplicationStatus.PENDING.getCode()) {
             throw new BusinessException(40003, "该申请已审核，请勿重复操作");
         }
 
@@ -161,41 +199,49 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
             pickupPoint.setStatus(1);
             pickupPointMapper.insert(pickupPoint);
 
-            // 2. 追加 ROLE_GROUP_LEADER 角色（先物理清除软删除记录再插入，防唯一约束冲突）
-            // 先物理清除软删除的记录（@TableLogic 软删除后唯一约束仍占位）
+            // 2. 追加 ROLE_GROUP_LEADER 角色
+            // 先物理清除旧记录（含软删除的），释放唯一键占位，再插入
             userRoleMapper.physicalDelete(application.getUserId(), "ROLE_GROUP_LEADER");
-
-            boolean hasRole = userRoleMapper.exists(
-                    new LambdaQueryWrapper<UserRole>()
-                            .eq(UserRole::getUserId, application.getUserId())
-                            .eq(UserRole::getRole, "ROLE_GROUP_LEADER")
-            );
-            if (!hasRole) {
-                UserRole userRole = new UserRole();
-                userRole.setUserId(application.getUserId());
-                userRole.setRole("ROLE_GROUP_LEADER");
-                userRoleMapper.insert(userRole);
-            }
+            UserRole userRole = new UserRole();
+            userRole.setUserId(application.getUserId());
+            userRole.setRole("ROLE_GROUP_LEADER");
+            userRoleMapper.insert(userRole);
 
             // 3. 更新申请状态
-            application.setStatus(1);
+            application.setStatus(ApplicationStatus.APPROVED.getCode());
             application.setReviewedTime(LocalDateTime.now());
             applicationMapper.updateById(application);
 
             log.info("团长申请已通过: id={} userId={} pickupPointId={}",
                     id, application.getUserId(), pickupPoint.getId());
+
+            operationLogService.record(SecurityUtil.currentUserId(),
+                    OperationLogService.GROUP_LEADER_REVIEW,
+                    OperationLogService.TARGET_APPLICATION,
+                    id,
+                    ApplicationStatus.PENDING.getText(),
+                    ApplicationStatus.APPROVED.getText(),
+                    "团长申请审核通过");
         } else {
             // -------- 拒绝 --------
             if (dto.getRejectReason() == null || dto.getRejectReason().isBlank()) {
                 throw new BusinessException(40004, "拒绝原因不能为空");
             }
-            application.setStatus(2);
+            application.setStatus(ApplicationStatus.REJECTED.getCode());
             application.setRejectReason(dto.getRejectReason());
             application.setReviewedTime(LocalDateTime.now());
             applicationMapper.updateById(application);
 
             log.info("团长申请已拒绝: id={} userId={} reason={}",
                     id, application.getUserId(), dto.getRejectReason());
+
+            operationLogService.record(SecurityUtil.currentUserId(),
+                    OperationLogService.GROUP_LEADER_REVIEW,
+                    OperationLogService.TARGET_APPLICATION,
+                    id,
+                    ApplicationStatus.PENDING.getText(),
+                    ApplicationStatus.REJECTED.getText(),
+                    "拒绝原因:" + dto.getRejectReason());
         }
 
         return toVO(application);
@@ -203,21 +249,29 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
 
     // ==================== 提货核销 ====================
 
+    /**
+     * 团长输入提货码核销自提.
+     *
+     * <p>校验团长所属自提点 → 提货码查订单 → 归属&状态校验 → 更新已自提(6).
+     * 核销后自动生成团长佣金.</p>
+     *
+     * @param pickupCode 6位提货码
+     */
     @Override
     public void verifyPickup(String pickupCode) {
         Long userId = SecurityUtil.currentUserId();
 
-        // 1. 查团长所属自提点
-        List<PickupPoint> points = pickupPointMapper.selectList(
+        // 1. 查团长所属自提点（一个团长只有一个自提点）
+        PickupPoint myPoint = pickupPointMapper.selectOne(
                 new LambdaQueryWrapper<PickupPoint>()
                         .eq(PickupPoint::getOwnerType, 2)
                         .eq(PickupPoint::getOwnerId, userId)
                         .eq(PickupPoint::getStatus, 1)
         );
-        if (points.isEmpty()) {
+        if (myPoint == null) {
             throw new BusinessException(40005, "您不是团长，无权核销");
         }
-        Long myPickupPointId = points.get(0).getId();
+        Long myPickupPointId = myPoint.getId();
 
         // 2. 按提货码查订单
         List<Order> orders = orderMapper.selectList(
@@ -227,7 +281,7 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
         if (orders.isEmpty()) {
             throw new BusinessException(40006, "提货码无效");
         }
-        Order order = orders.get(0);
+        Order order = orders.getFirst();
 
         // 3. 校验订单归属自提点
         if (order.getPickupPointId() == null
@@ -247,32 +301,44 @@ public class GroupLeaderApplicationServiceImpl implements GroupLeaderApplication
 
         log.info("自提核销完成: pickupCode={} orderNo={} pickupPointId={}",
                 pickupCode, order.getOrderNo(), myPickupPointId);
+
+        operationLogService.record(userId,
+                OperationLogService.PICKUP_VERIFY,
+                OperationLogService.TARGET_ORDER,
+                order.getId(),
+                OrderStatus.RECEIVED.getText(),
+                OrderStatus.PICKED_UP.getText(),
+                "提货码核销:" + pickupCode);
+
+        // 核销后自动生成团长佣金
+        commissionService.create(order.getId());
     }
 
     // ==================== 团长自提点 ====================
 
+    /**
+     * 查询团长自己的自提点.
+     *
+     * @return 团长所属的自提点列表（ownerType=2 + ownerId=当前用户）
+     */
     @Override
     public List<PickupPoint> myPickupPoint() {
         Long userId = SecurityUtil.currentUserId();
 
-        return pickupPointMapper.selectList(
+        PickupPoint point = pickupPointMapper.selectOne(
                 new LambdaQueryWrapper<PickupPoint>()
                         .eq(PickupPoint::getOwnerType, 2)
                         .eq(PickupPoint::getOwnerId, userId)
                         .eq(PickupPoint::getStatus, 1)
         );
+        return point != null ? List.of(point) : Collections.emptyList();
     }
 
     // ==================== 内部方法 ====================
 
     /** Entity → VO */
     private GroupLeaderApplicationVO toVO(GroupLeaderApplication entity) {
-        String statusText = switch (entity.getStatus()) {
-            case 0 -> "待审核";
-            case 1 -> "已通过";
-            case 2 -> "已拒绝";
-            default -> "未知";
-        };
+        String statusText = ApplicationStatus.textOf(entity.getStatus());
 
         return GroupLeaderApplicationVO.builder()
                 .id(entity.getId())

@@ -23,23 +23,4 @@ public interface ProductSkuMapper extends BaseMapper<ProductSku> {
      */
     @Delete("DELETE FROM product_sku WHERE product_id = #{productId}")
     void deleteByProductId(@Param("productId") Long productId);
-
-    /**
-     * 扣减库存（WHERE stock >= quantity 防超卖，返回受影响行数判成败）.
-     *
-     * @param skuId    规格ID
-     * @param quantity 扣减数量
-     * @return 1=成功 0=库存不足
-     */
-    @Update("UPDATE product_sku SET stock = stock - #{quantity} WHERE id = #{skuId} AND stock >= #{quantity}")
-    int deductStock(@Param("skuId") Long skuId, @Param("quantity") int quantity);
-
-    /**
-     * 回补库存（取消订单/超时取消时用）.
-     *
-     * @param skuId    规格ID
-     * @param quantity 回补数量
-     */
-    @Update("UPDATE product_sku SET stock = stock + #{quantity} WHERE id = #{skuId}")
-    int addStock(@Param("skuId") Long skuId, @Param("quantity") int quantity);
 }

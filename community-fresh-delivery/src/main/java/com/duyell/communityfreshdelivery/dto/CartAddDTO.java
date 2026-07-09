@@ -19,8 +19,9 @@ public class CartAddDTO {
     @NotNull(message = "SKU ID 不能为空")
     private Long skuId;
 
-    /** 数量（1=加1件，修改时传目标数量） */
+    /** 数量（1=加1件，修改时传目标数量，最多999件） */
     @NotNull(message = "数量不能为空")
     @Positive(message = "数量必须大于0")
+    @jakarta.validation.constraints.Max(value = 999, message = "单次数量不能超过999")
     private Integer quantity;
 }

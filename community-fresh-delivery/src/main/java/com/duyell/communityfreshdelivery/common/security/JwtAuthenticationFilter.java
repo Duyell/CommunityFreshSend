@@ -67,7 +67,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (token != null && jwtUtil.isTokenValid(token)) {
             // 检查 token 是否在黑名单中（已登出）
-            if (redisTemplate.hasKey(JWT_BLACKLIST_PREFIX + token)) {
+            String blacklistKey = JWT_BLACKLIST_PREFIX + token;
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(blacklistKey))) {
                 log.debug("JWT 认证失败：token 已登出（命中黑名单）");
                 filterChain.doFilter(request, response);
                 return;
@@ -75,6 +76,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             Long userId = jwtUtil.getUserIdFromToken(token);
             List<String> roles = jwtUtil.getRolesFromToken(token);
+
+            // 检查用户账号是否已被禁用（Redis 缓存，避免每次查 DB）
+            String disabledKey = "user:disabled:" + userId;
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(disabledKey))) {
+                log.warn("JWT 认证失败：用户 {} 已被禁用", userId);
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             // 从 JWT 构建 UserDetails（无需密码，JWT 签名已验证；enabled=true 因为登录时已检查状态）
             UserDetailsImpl userDetails = new UserDetailsImpl(userId, null, roles, true);

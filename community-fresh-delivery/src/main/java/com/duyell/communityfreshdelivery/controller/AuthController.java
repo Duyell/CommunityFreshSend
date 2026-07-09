@@ -1,5 +1,6 @@
 package com.duyell.communityfreshdelivery.controller;
 
+import com.duyell.communityfreshdelivery.common.annotation.RateLimit;
 import com.duyell.communityfreshdelivery.common.result.Result;
 import com.duyell.communityfreshdelivery.common.utils.JwtUtil;
 import com.duyell.communityfreshdelivery.dto.LoginDTO;
@@ -44,6 +45,7 @@ public class AuthController {
      */
     @PostMapping("/login")
     @Operation(summary = "登录")
+    @RateLimit(key = "auth:login", limit = 10, window = 60, message = "登录过于频繁，请60秒后再试")
     public Result<LoginVO> login(@Valid @RequestBody LoginDTO dto) {
         LoginVO vo = authService.login(dto);
         return Result.ok("登录成功", vo);
@@ -59,6 +61,7 @@ public class AuthController {
      */
     @PostMapping("/register")
     @Operation(summary = "注册")
+    @RateLimit(key = "auth:register", limit = 3, window = 60, message = "注册过于频繁，请60秒后再试")
     public Result<RegisterVO> register(@Valid @RequestBody RegisterDTO dto) {
         RegisterVO vo = authService.register(dto);
         return Result.ok("注册成功", vo);

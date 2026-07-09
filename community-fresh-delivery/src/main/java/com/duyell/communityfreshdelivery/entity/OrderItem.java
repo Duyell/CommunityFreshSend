@@ -35,6 +35,15 @@ public class OrderItem {
     /** 规格ID */
     private Long skuId;
 
+    /** 出库批次ID（下单时FIFO分配，保留兼容旧数据） */
+    private Long batchId;
+
+    /**
+     * 批次分配明细（JSON数组: [{"bid":1,"qty":3},{"bid":2,"qty":7}]）.
+     * 取消时据此精确回补各批次库存，替代仅靠 batchId 回补的旧逻辑.
+     */
+    private String batchAllocations;
+
     /** 商品名称快照（下单时的名称） */
     private String productName;
 

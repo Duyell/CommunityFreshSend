@@ -58,10 +58,5 @@ public class ProductSaveDTO {
         @NotNull(message = "售价不能为空")
         @Positive(message = "售价必须大于0")
         private BigDecimal price;
-
-        /** 库存 */
-        @NotNull(message = "库存不能为空")
-        @Positive(message = "库存必须大于0")
-        private Integer stock;
     }
 }

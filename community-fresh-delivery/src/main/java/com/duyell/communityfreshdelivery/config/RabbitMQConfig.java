@@ -29,10 +29,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    @Value("${app.biz.auto-cancel-queue}")
+    @Value("${app.mq.auto-cancel-queue}")
     private String cancelQueueName;
 
-    @Value("${app.biz.order-timeout}")
+    @Value("${app.mq.order-timeout}")
     private int orderTimeoutMinutes;
 
     /** 取消交换机（死信消息投递到此处） */

@@ -144,11 +144,7 @@ public class ReviewServiceImpl implements ReviewService {
                         .eq(Review::getProductId, productId)
                         .orderByDesc(Review::getCreateTime)
         );
-
-        List<ReviewVO> vos = toVOList(result.getRecords());
-        Page<ReviewVO> voPage = new Page<>(page, size, result.getTotal());
-        voPage.setRecords(vos);
-        return voPage;
+        return toVOPage(result);
     }
 
     @Override
@@ -161,14 +157,18 @@ public class ReviewServiceImpl implements ReviewService {
                         .eq(Review::getUserId, userId)
                         .orderByDesc(Review::getCreateTime)
         );
-
-        List<ReviewVO> vos = toVOList(result.getRecords());
-        Page<ReviewVO> voPage = new Page<>(page, size, result.getTotal());
-        voPage.setRecords(vos);
-        return voPage;
+        return toVOPage(result);
     }
 
     // ==================== 内部方法 ====================
+
+    /** Entity 分页 → VO 分页 */
+    private Page<ReviewVO> toVOPage(Page<Review> result) {
+        List<ReviewVO> vos = toVOList(result.getRecords());
+        Page<ReviewVO> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
+        voPage.setRecords(vos);
+        return voPage;
+    }
 
     private List<ReviewVO> toVOList(List<Review> reviews) {
         if (reviews.isEmpty()) {
@@ -210,6 +210,6 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private ReviewVO toVO(Review review) {
-        return toVOList(List.of(review)).get(0);
+        return toVOList(List.of(review)).getFirst();
     }
 }

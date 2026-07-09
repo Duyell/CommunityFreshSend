@@ -17,6 +17,7 @@ import com.duyell.communityfreshdelivery.mapper.DeliveryMapper;
 import com.duyell.communityfreshdelivery.mapper.OrderMapper;
 import com.duyell.communityfreshdelivery.mapper.PickupPointMapper;
 import com.duyell.communityfreshdelivery.service.DeliveryService;
+import com.duyell.communityfreshdelivery.service.OperationLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -67,6 +68,7 @@ public class DeliveryServiceImpl implements DeliveryService {
     private final OrderMapper orderMapper;
     private final AddressMapper addressMapper;
     private final PickupPointMapper pickupPointMapper;
+    private final OperationLogService operationLogService;
 
     // ==================== 接单大厅 ====================
 
@@ -107,11 +109,17 @@ public class DeliveryServiceImpl implements DeliveryService {
             throw new BusinessException(20006, "订单不存在");
         }
 
-        // 2. 原子抢单：WHERE status = PENDING_DELIVERY 确保只有第一个抢的人成功
+        // 抢单仅限配送到家订单（自提订单不需要配送员）
+        if (!DeliveryType.HOME_DELIVERY.getCode().equals(order.getDeliveryType())) {
+            throw new BusinessException(40001, "该订单为自提订单，不可抢单");
+        }
+
+        // 2. 原子抢单：WHERE status = PENDING_DELIVERY AND delivery_type = 1 确保只有第一个抢的人成功
         int updated = orderMapper.update(null,
                 new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Order>()
                         .eq(Order::getId, orderId)
                         .eq(Order::getStatus, OrderStatus.PENDING_DELIVERY.getCode())
+                        .eq(Order::getDeliveryType, DeliveryType.HOME_DELIVERY.getCode())
                         .set(Order::getStatus, OrderStatus.IN_DELIVERY.getCode())
         );
         if (updated == 0) {
@@ -130,6 +138,15 @@ public class DeliveryServiceImpl implements DeliveryService {
         Map<Long, PickupPoint> pickupMap = loadPickupPointMap(List.of(order));
 
         log.info("配送员抢单: userId={} orderNo={}", userId, order.getOrderNo());
+
+        operationLogService.record(userId,
+                OperationLogService.DELIVERY_GRAB,
+                OperationLogService.TARGET_ORDER,
+                orderId,
+                OrderStatus.PENDING_DELIVERY.getText(),
+                OrderStatus.IN_DELIVERY.getText(),
+                "配送员抢单");
+
         return buildVO(delivery, order, addressMap, pickupMap);
     }
 
@@ -174,6 +191,14 @@ public class DeliveryServiceImpl implements DeliveryService {
         orderMapper.updateById(order);
 
         log.info("配送员送达确认: userId={} orderNo={}", SecurityUtil.currentUserId(), order.getOrderNo());
+
+        operationLogService.record(SecurityUtil.currentUserId(),
+                OperationLogService.DELIVERY_COMPLETE,
+                OperationLogService.TARGET_ORDER,
+                orderId,
+                OrderStatus.IN_DELIVERY.getText(),
+                OrderStatus.RECEIVED.getText(),
+                "配送员确认送达");
     }
 
     // ==================== 我的配送 ====================

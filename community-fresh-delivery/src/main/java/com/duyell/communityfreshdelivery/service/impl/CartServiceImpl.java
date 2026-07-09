@@ -6,7 +6,9 @@ import com.duyell.communityfreshdelivery.common.utils.SecurityUtil;
 import com.duyell.communityfreshdelivery.dto.CartAddDTO;
 import com.duyell.communityfreshdelivery.dto.CartItemVO;
 import com.duyell.communityfreshdelivery.entity.Product;
+import com.duyell.communityfreshdelivery.entity.ProductBatch;
 import com.duyell.communityfreshdelivery.entity.ProductSku;
+import com.duyell.communityfreshdelivery.mapper.ProductBatchMapper;
 import com.duyell.communityfreshdelivery.mapper.ProductMapper;
 import com.duyell.communityfreshdelivery.mapper.ProductSkuMapper;
 import com.duyell.communityfreshdelivery.service.CartService;
@@ -16,6 +18,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,6 +53,7 @@ public class CartServiceImpl implements CartService {
     private final StringRedisTemplate redisTemplate;
     private final ProductSkuMapper productSkuMapper;
     private final ProductMapper productMapper;
+    private final ProductBatchMapper productBatchMapper;
 
     private static final String CART_KEY_PREFIX = "cart:user:";
 
@@ -61,15 +65,9 @@ public class CartServiceImpl implements CartService {
     public void add(CartAddDTO dto) {
         validateSku(dto.getSkuId());
 
-        String existing = redisTemplate.<String, String>opsForHash()
-                .get(cartKey(), dto.getSkuId().toString());
-        int newQuantity = dto.getQuantity();
-        if (existing != null) {
-            newQuantity = Integer.parseInt(existing) + dto.getQuantity();
-        }
-
-        redisTemplate.opsForHash().put(cartKey(),
-                dto.getSkuId().toString(), String.valueOf(newQuantity));
+        // 原子自增数量（Redis HINCRBY），避免并发 read-then-write 丢失更新
+        Long newQuantity = redisTemplate.opsForHash()
+                .increment(cartKey(), dto.getSkuId().toString(), dto.getQuantity());
         log.info("加购成功: userId={} skuId={} quantity={}", SecurityUtil.currentUserId(), dto.getSkuId(), newQuantity);
     }
 
@@ -124,6 +122,21 @@ public class CartServiceImpl implements CartService {
         Map<Long, Product> productMap = products.stream()
                 .collect(Collectors.toMap(Product::getId, p -> p));
 
+        // 批量查批次库存：按 product 聚合 remaining
+        Map<Long, Integer> batchStockMap = Collections.emptyMap();
+        if (!productIds.isEmpty()) {
+            List<ProductBatch> batches = productBatchMapper.selectList(
+                    new LambdaQueryWrapper<ProductBatch>()
+                            .in(ProductBatch::getProductId, productIds)
+                            .gt(ProductBatch::getRemaining, 0)
+            );
+            batchStockMap = batches.stream()
+                    .collect(Collectors.groupingBy(
+                            ProductBatch::getProductId,
+                            Collectors.summingInt(ProductBatch::getRemaining)
+                    ));
+        }
+
         List<CartItemVO> items = new ArrayList<>();
         for (Map.Entry<Object, Object> entry : entries.entrySet()) {
             Long skuId = Long.valueOf(entry.getKey().toString());
@@ -139,6 +152,8 @@ public class CartServiceImpl implements CartService {
                 firstImage = product.getImages();
             }
 
+            int totalStock = batchStockMap.getOrDefault(sku.getProductId(), 0);
+
             items.add(CartItemVO.builder()
                     .skuId(skuId)
                     .productId(sku.getProductId())
@@ -147,20 +162,26 @@ public class CartServiceImpl implements CartService {
                     .specName(sku.getSpecName())
                     .price(sku.getPrice())
                     .quantity(quantity)
-                    .stock(sku.getStock())
-                    .stockSufficient(sku.getStock() >= quantity)
+                    .stock(totalStock)
+                    .stockSufficient(totalStock >= quantity)
                     .build());
         }
         return items;
     }
 
-    /** 校验 SKU 存在且可购买 */
+    /** 校验 SKU 存在且可购买（库存检查走批次表） */
     private void validateSku(Long skuId) {
         ProductSku sku = productSkuMapper.selectById(skuId);
         if (sku == null || sku.getStatus() == 0) {
             throw new BusinessException(10002, "商品规格不存在或已下架");
         }
-        if (sku.getStock() <= 0) {
+        // 检查商品是否有批次库存
+        Long count = productBatchMapper.selectCount(
+                new LambdaQueryWrapper<ProductBatch>()
+                        .eq(ProductBatch::getProductId, sku.getProductId())
+                        .gt(ProductBatch::getRemaining, 0)
+        );
+        if (count == null || count == 0) {
             throw new BusinessException(10003, "商品库存不足");
         }
     }

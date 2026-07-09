@@ -68,12 +68,7 @@ app:
     secret: huangyucheng13788539942freshfood
     expiration: 86400000  # 24小时，单位毫秒
 
-  # 业务配置
-  biz:
-    delivery-fee: 5.0              # 基础配送费（元）
-    free-delivery-threshold: 30.0  # 满30免配送费
-    min-order-amount: 15.0         # 起送价（元）
-    package-fee: 1.0               # 包装费（元/单）
+  # 消息队列配置（启动时加载，不走 DB）
+  mq:
     order-timeout: 15              # 订单超时（分钟）
-    pickup-timeout-days: 3         # 自提超时（天）
     auto-cancel-queue: order.auto.cancel  # 延迟队列名
